@@ -9,6 +9,8 @@
 #include<unistd.h>
 #include <pthread.h>
 #include <dirent.h>
+#include <openssl/ssl.h>
+
 using namespace std;
 
 typedef struct sockaddr_in sockin_t;
@@ -41,11 +43,15 @@ int main(int argc,char *argv[])
     rewind(f);
 
     send(sock,&size,sizeof(size),0);
-    char Buffer [512] ; 
+    unsigned char chunk[512*1024]={0};
+    unsigned char hashout[20];
     int n=0;
-	while ( ( n = fread( Buffer , sizeof(char) , 512 , f ) ) > 0  && size > 0 ){
-		send (sock , Buffer, n, 0 );
-   	 	memset ( Buffer , '\0', 512);
+    vector<string> hashes;
+	while ( ( n = fread( chunk , sizeof(char) , sizeof(chunk) , f ) ) > 0  && size > 0 ){
+		
+        SHA(chunk,n,hashout);
+        send (sock , hashout, 20, 0 );
+   	 	memset ( chunk , '\0', sizeof(chunk));
 		size = size - n ;
     }
     fclose(f);

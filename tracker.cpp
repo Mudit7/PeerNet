@@ -9,7 +9,6 @@
 #include<unistd.h>
 #include <pthread.h>
 #include <dirent.h>
-#include <openssl/ssl.h>
 
 using namespace std;
 
@@ -41,13 +40,14 @@ int main(int argc,char *argv[])
     recv(client_sockfd,&filesize,sizeof(filesize),0);
     FILE *f=fopen("recvFile","wb");
 
-    char buffer[512]={0};
+    vector<string> hashes;
+    char buffer[20]={0};
     int n=0;
-    while ( ( n = recv( client_sockfd , buffer ,512, 0) ) > 0  && filesize > 0){
-	
-    fwrite (buffer , sizeof (char), n, f);
-    memset (buffer, '\0', 512);
-    filesize = filesize - n;
+    while ( ( n = recv( client_sockfd , buffer ,20, 0) ) > 0 ){
+	hashes.push_back(buffer);
+    cout<<buffer;
+    //fwrite (buffer , sizeof (char), n, f);
+    memset (buffer, '\0', 20);
     } 
 
     close(client_sockfd);
