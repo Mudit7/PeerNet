@@ -10,39 +10,70 @@
 #include <pthread.h>
 #include <dirent.h>
 #include <openssl/ssl.h>
+#include <sstream>
 
 using namespace std;
 
 string getHash(string filepath);
 int connectToTracker(int port);
+vector<string> splitString(string);
+string makemsg(vector<string> input_s);
 
 typedef struct sockaddr_in sockin_t;
 typedef struct sockaddr sock_t;
-int sock = 0;
+int sock = -1;
 int main(int argc,char *argv[])
 {
     int portNum=atoi(argv[1]);
     sock=connectToTracker(portNum);
-    
-    //send (sock , hashout, 20, 0 );
+    if(sock<0)
+    {
+        cout<<"connect failed, exiting..";
+        return -1;
+    }
+    //
     string input;
+    
     getline(cin,input);
     vector<string> input_s = splitString(input);
-
-
+    vector<string> msg_s;
+    //attach peerid/port first always
+    //msg_s.push_back(string(sock));
     if(input_s[0]=="upload")
-    string fileHash=getHash(input_s[1]);
-    cout<<fileHash<<endl;
+    { 
+        msg_s.push_back(input_s[0]);      //cmd
+        msg_s.push_back(input_s[1]);      //filename
+        string fileHash=getHash(input_s[1]);
+        msg_s.push_back(fileHash);        //Hash of file chunks
+         //add code to append port and file name
+    }
+    string res=makemsg(msg_s);
+    send (sock , (void*)res.c_str(), (size_t)res.size(), 0 );
+    //cout<<res.c_str();
     return 0;
 }
 
 vector<string> splitString(string input)
 {
     vector<string> res;
+    stringstream ss(input);
+    string token;
 
+    while(getline(ss, token, ' ')) {
+        res.push_back(token);
+    }
+    
     return res;
 }
+string makemsg(vector<string> input_s)
+{
+    string res;
+    for(int i=0;i<input_s.size();i++)
+        res=res+input_s[i]+'#';
 
+   
+    return res;
+}
 string getHash(string filepath)
 {
     FILE *f=fopen(filepath.c_str(),"rb");
@@ -70,14 +101,15 @@ string getHash(string filepath)
 		size = size - sizeof(chunk) ;
     }
 
-    fclose(f);
-    close(sock);
+    //fclose(f);
+    //close(sock);
 
     return totalHash;
 }
 
 int connectToTracker(int port)
 {
+    cout<<"connecting to tracker on port "<<port<<endl;
     sockin_t server_addr;
     int sock_d;
     if ((sock_d = socket(AF_INET, SOCK_STREAM, 0)) < 0)

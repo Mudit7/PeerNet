@@ -30,7 +30,7 @@ int main(int argc,char *argv[])
     }
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(2002);
+    serv_addr.sin_port = htons(atoi(argv[1]));
     serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
 
     int addrlen=sizeof(serv_addr);
@@ -39,6 +39,7 @@ int main(int argc,char *argv[])
     
     int status=listen(sock,5);
 
+    //one thread per client
     while(1)
     {
         int client_sockfd=accept(sock,(sock_t*)&serv_addr,(socklen_t*)&addrlen);
@@ -61,20 +62,23 @@ int main(int argc,char *argv[])
 
 void *servicethread(void *sockNum)
 {
-    //cout<<"thread here "<<endl;
+    cout<<"new thread created.. "<<endl;
     // int filesize;
     // recv(client_sockfd,&filesize,sizeof(filesize),0);
     // FILE *f=fopen("recvFile","wb");
     int sockfd=*((int*)sockNum);
-    vector<string> hashes;
+    //vector<string> hashes;
     //cout<<sockfd<<endl;
-    char buffer[20]={0};
+
+
+    char buffer[100]={0};
     int n=0;
-    while (( n = recv(sockfd , buffer ,10, 0) ) > 0 ){
-        hashes.push_back(buffer);
+    while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
+        //hashes.push_back(buffer);
         cout<<buffer<<endl;
         //fwrite (buffer , sizeof (char), n, f);
-        memset (buffer, '\0', 20);
+        memset (buffer, '\0', 100);
     }
+    cout<<"Thread Exiting..\n";
     return NULL;
 }
