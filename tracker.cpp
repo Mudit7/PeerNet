@@ -1,24 +1,18 @@
-#include </Users/mudit/stdc++.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include<arpa/inet.h>
-#include <signal.h>
-#include <netinet/in.h>
-#include<netdb.h>
-#include<errno.h>
-#include<unistd.h>
-#include <pthread.h>
-#include <dirent.h>
+#include "includes.h"
 
 using namespace std;
 
-typedef struct sockaddr_in sockin_t;
-typedef struct sockaddr sock_t;
+
 
 void *servicethread(void *sock);
 
 int main(int argc,char *argv[])
 {
+    if(argc<2) 
+    {
+        cout<<"Enter the port number next time!\nExiting...\n";
+        return 0;
+    }
     int sock = 0;
     sockin_t serv_addr;
     pthread_t thread_id;
