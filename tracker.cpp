@@ -19,6 +19,8 @@ int main(int argc,char *argv[])
     {
         serverPortNum=atoi(argv[1]);
     }
+
+    // make the tracker socket (primary)
     int sock = 0;
     sockin_t serv_addr;
     pthread_t thread_id;
@@ -32,11 +34,9 @@ int main(int argc,char *argv[])
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(serverPortNum);
     serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
-
     int addrlen=sizeof(serv_addr);
 
-    bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));
-    
+    bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));  
     int status=listen(sock,5);
 
     //one thread per client
@@ -51,11 +51,15 @@ int main(int argc,char *argv[])
         if (pthread_create(&thread_id, NULL, servicethread, (void *)&client_sockfd) < 0)
         {
             perror("\ncould not create thread\n");
-        }
-       
+        }    
     }
    
     return 0;
+}
+
+void processReq(string buffer)
+{
+
 }
 
 void *servicethread(void *sockNum)
@@ -71,7 +75,7 @@ void *servicethread(void *sockNum)
         while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
           
             cout<<buffer<<endl;
-            
+            processReq(buffer);
             memset (buffer, '\0', 100);
         }
     }

@@ -46,18 +46,15 @@ int main(int argc,char *argv[])
     {
         printf("\n Socket creation error in client side\n");
         return -1;
-    }
-   
+    }  
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(clientPortNum);
     serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
-    
 
-    bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));
-    
+    bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));   
     int status=listen(sock,5);
-
+    //sending server to a thread
     if (pthread_create(&thread_id, NULL, servicethread, (void *)&sock) < 0)
     {
         perror("\n Could not create thread\n");
@@ -65,7 +62,7 @@ int main(int argc,char *argv[])
     
 
     //******************************
-    // process user requests
+    // process user requests (client side)
     while(1)
     {
         string input;
@@ -75,8 +72,6 @@ int main(int argc,char *argv[])
         if(input_s.size()<1) continue;
 
         vector<string> msg_s;
-        //attach peerid/port first always
-        //msg_s.push_back(string(sock));
 
         if(input_s[0]=="create_user")
         { 
@@ -99,36 +94,13 @@ int main(int argc,char *argv[])
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
             cout<<"File Hash sent to tracker\n";
         }
-
     }
 
     cout<<"client is somehow exiting\n";
     return 0;
 }
 
-vector<string> splitString(string input)
-{
-    vector<string> res;
-    if(input.size()>2) 
-    {
-        stringstream ss(input);
-        string token;
 
-        while(getline(ss, token, ' ')) {
-            res.push_back(token);
-        }  
-    }
-    
-    return res;
-}
-string makemsg(vector<string> input_s)
-{
-    string res;
-    for(int i=0;i<input_s.size();i++)
-        res=res+input_s[i]+'#';
-
-    return res;
-}
 
 void *servicethread(void *sock_void)
 {
