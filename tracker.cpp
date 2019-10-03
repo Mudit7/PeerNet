@@ -2,8 +2,6 @@
 
 using namespace std;
 
-
-
 void *servicethread(void *sock);
 
 // ./tracker 4000(tracker port)
@@ -59,7 +57,7 @@ int main(int argc,char *argv[])
 
 void processReq(string buffer)
 {
-
+    // cases for all kinds of requests
 }
 
 void *servicethread(void *sockNum)

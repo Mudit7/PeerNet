@@ -46,7 +46,7 @@ int main(int argc,char *argv[])
     {
         printf("\n Socket creation error in client side\n");
         return -1;
-    }  
+    }
     memset(&serv_addr, '0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(clientPortNum);
@@ -74,18 +74,28 @@ int main(int argc,char *argv[])
         vector<string> msg_s;
 
         if(input_s[0]=="create_user")
-        { 
+        {
+            if(input_s.size()!=3)
+            {
+                cout<<"Invalid Input\n";
+                return -1;
+            } 
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //user id
             msg_s.push_back(input_s[2]);       //password
             msg_s.push_back(to_string(clientPortNum));   //port of the client
             string res=makemsg(msg_s);
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
-            cout<<"Create request sent to tracker\n";
+            cout<<"Create user request sent to tracker\n";
         }
 
-        if(input_s[0]=="upload")
-        { 
+        if(input_s[0]=="upload_file")
+        {
+            if(input_s.size()!=2)
+            {
+                cout<<"Invalid Input\n";
+                return -1;
+            }  
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //filename
             string fileHash=getHash(input_s[1]);
@@ -99,8 +109,6 @@ int main(int argc,char *argv[])
     cout<<"client is somehow exiting\n";
     return 0;
 }
-
-
 
 void *servicethread(void *sock_void)
 {
@@ -119,9 +127,7 @@ void *servicethread(void *sock_void)
     while(1)
     {
         while (( n = recv(newsockfd , buffer ,100, 0) ) > 0 ){
-            //hashes.push_back(buffer);
             cout<<buffer<<endl;
-            //fwrite (buffer , sizeof (char), n, f);
             memset (buffer, '\0', 100);
         }
     }
