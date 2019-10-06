@@ -1,8 +1,7 @@
 #include "includes.h"
 
-using namespace std;
 
-vector<string> splitString(string input)
+vector<string> splitStringOnSpace(string input)
 {
     vector<string> res;
     if(input.size()>2) 
@@ -17,12 +16,27 @@ vector<string> splitString(string input)
     
     return res;
 }
+vector<string> splitStringOnHash(string input)
+{
+    vector<string> res;
+    if(input.size()>2) 
+    {
+        stringstream ss(input);
+        string token;
+
+        while(getline(ss, token, '#')) {
+            res.push_back(token);
+        }  
+    }
+    
+    return res;
+}
 string makemsg(vector<string> input_s)
 {
     string res;
     for(int i=0;i<input_s.size();i++)
         res=res+input_s[i]+'#';
-
+        
     return res;
 }
 
@@ -31,7 +45,7 @@ string getHash(string filepath)
     FILE *f=fopen(filepath.c_str(),"rb");
     if(f==NULL)
     {
-        cout<<"Error: File to upload doesn't exist with client";
+        perror("Error, client");
         return NULL;
     }
     fseek(f,0,SEEK_END);

@@ -1,7 +1,6 @@
 #include "includes.h"
 
 using namespace std;
-
 void *servicethread(void *sock);
 
 // ./tracker 4000(tracker port)
@@ -36,7 +35,7 @@ int main(int argc,char *argv[])
 
     bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));  
     int status=listen(sock,5);
-
+    cout<<"tracker initialised\n";
     //one thread per client
     while(1)
     {
@@ -55,9 +54,48 @@ int main(int argc,char *argv[])
     return 0;
 }
 
-void processReq(string buffer)
+string lookup(string filename)
+{
+    string portlist;
+    vector<string> ports;
+    //lookup for ports in stored data.. hardcoding here
+    ports.push_back(to_string(7000));
+
+    portlist=makemsg(ports);
+    return portlist;
+}
+
+
+
+void trackerProcessReq(string buffer)
 {
     // cases for all kinds of requests
+    vector<string> req;
+    req=splitStringOnHash(buffer);
+    if(req[1]=="download")
+    {
+        int senderPort=atoi(req[0].c_str());
+        string filename=req[2];
+        //cout<<filename<<endl;
+        string portList=lookup(filename);
+        int newsock;
+        if((newsock=connectToPort(senderPort))<0)
+        {
+            cout<<"connect to port failed..";
+        }
+        string msg="portList";
+        msg+="#";
+        msg+=portList;
+        send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+    }
+    if(req[1]=="upload")
+    {
+        cout<<"upload request recieved\n";
+        // string filename=req[1];
+        // //cout<<filename<<endl;
+        // string portlist=lookup(filename);
+
+    }
 }
 
 void *servicethread(void *sockNum)
@@ -73,7 +111,8 @@ void *servicethread(void *sockNum)
         while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
           
             cout<<buffer<<endl;
-            processReq(buffer);
+            trackerProcessReq(string((char*)buffer));
+           // processReq("download#dsf");
             memset (buffer, '\0', 100);
         }
     }

@@ -1,19 +1,32 @@
 #include "includes.h"
 
-using namespace std;
 
-string getHash(string filepath);
-int connectToTracker(int port);
-vector<string> splitString(string);
-string makemsg(vector<string> input_s);
 
-typedef struct sockaddr_in sockin_t;
-typedef struct sockaddr sock_t;
-
-void *servicethread(void *sock);
-
- sockin_t serv_addr;
+sockin_t serv_addr;
 //./client 3000(own port) 4000(tracker port)
+
+void peerProcessRequest(string input)
+{
+    vector<string> inreq=splitStringOnHash(input);
+    if(inreq[0]=="portList")
+    {
+        // int portNum=atoi(inreq[0].c_str());
+        // int newsock;
+        // if((newsock=connectToPort(portNum))<0)
+        // {
+        //     cout<<"connect to port failed..";
+        // }
+        //now form the 'share' request to send to other peers(list recieved from tracker)
+        //send (newsock , (void*)res.c_str(), (size_t)res.size(), 0 );
+        cout<<"\nImma get it from: ";
+        for(int i=1;i<inreq.size();i++)
+        {
+            cout<<inreq[i]<<" ";
+        }
+        cout<<endl;
+    }
+}
+
 int main(int argc,char *argv[])
 {
     int tracker_sockfd=-1;
@@ -55,7 +68,7 @@ int main(int argc,char *argv[])
     bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));   
     int status=listen(sock,5);
     //sending server to a thread
-    if (pthread_create(&thread_id, NULL, servicethread, (void *)&sock) < 0)
+    if (pthread_create(&thread_id, NULL, serverthread, (void *)&sock) < 0)
     {
         perror("\n Could not create thread\n");
     }
@@ -68,7 +81,7 @@ int main(int argc,char *argv[])
         string input;
         cout<<"Enter cmd: ";
         getline(cin,input);
-        vector<string> input_s = splitString(input);
+        vector<string> input_s = splitStringOnSpace(input);
         if(input_s.size()<1) continue;
 
         vector<string> msg_s;
@@ -77,13 +90,14 @@ int main(int argc,char *argv[])
         {
             if(input_s.size()!=3)
             {
-                cout<<"Invalid Input\n";
-                return -1;
+                cout<<"Invalid Input.. try again\n";
+                continue;
             } 
+            msg_s.push_back(to_string(clientPortNum));   //port of the client
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //user id
             msg_s.push_back(input_s[2]);       //password
-            msg_s.push_back(to_string(clientPortNum));   //port of the client
+            
             string res=makemsg(msg_s);
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
             cout<<"Create user request sent to tracker\n";
@@ -93,46 +107,78 @@ int main(int argc,char *argv[])
         {
             if(input_s.size()!=2)
             {
-                cout<<"Invalid Input\n";
-                return -1;
-            }  
+                cout<<"Invalid Input.. try again\n";
+                continue; 
+            }
+            msg_s.push_back(to_string(clientPortNum));   //port of the client  
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //filename
             string fileHash=getHash(input_s[1]);
             msg_s.push_back(fileHash);        //Hash of file chunks
+            string res=makemsg(msg_s);
+
+            send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
+            cout<<"File Hash sent to tracker\n";
+        }
+        if(input_s[0]=="download")
+        {
+            if(input_s.size()!=2)
+            {
+                cout<<"Invalid Input.. try again\n";
+                continue; 
+            }  
+            msg_s.push_back(to_string(clientPortNum));   //port of the client
+            msg_s.push_back(input_s[0]);      //cmd
+            msg_s.push_back(input_s[1]);      //filename
+           //Hash of file chunks
             string res=makemsg(msg_s);
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
             cout<<"File Hash sent to tracker\n";
         }
     }
 
-    cout<<"client is somehow exiting\n";
+    cout<<"Client is somehow exiting\n";
     return 0;
 }
 
-void *servicethread(void *sock_void)
+void *serverthread(void *sock_void)
 {
-    cout<<"Peer Server.. "<<endl;
+    //cout<<"Peer Server.. "<<endl;
 
-    int sock=*((int*)sock_void);
+    
     int addrlen=sizeof(serv_addr);
-    int newsockfd=accept(sock,(sock_t*)&serv_addr,(socklen_t*)&addrlen);
-        //cout<<"incoming!!\n";
-    if(newsockfd<0)
-    {
-        perror("accept");
-    }
-    char buffer[100]={0};
-    int n=0;
+    pthread_t thread_id;
+    int mainserversock=*((int*)sock_void);
     while(1)
     {
-        while (( n = recv(newsockfd , buffer ,100, 0) ) > 0 ){
-            cout<<buffer<<endl;
-            memset (buffer, '\0', 100);
+        int newsockfd=accept(mainserversock,(sock_t*)&serv_addr,(socklen_t*)&addrlen);
+            //cout<<"incoming!!\n";
+        if(newsockfd<0)
+        {
+            perror("accept");
         }
-    }
+        if (pthread_create(&thread_id, NULL, seeder, (void *)&newsockfd) < 0)
+        {
+            perror("\ncould not create thread in seeder\n");
+        }
+    }   
     cout<<"Peer server somehow Exiting..\n";
     return NULL;
 }
 
-
+void *seeder(void *sock_void)
+{
+    int seedersock=*((int*)sock_void);
+    cout<<"new seeder created!\n";
+    char buffer[100]={0};
+    int n=0;
+    while(1)
+    {
+        while (( n = recv(seedersock , buffer ,100, 0) ) > 0 ){
+            cout<<buffer<<endl;
+            //process requests from tracker and other peers
+            peerProcessRequest(string((char*)buffer));
+            memset (buffer, '\0', 100);
+        }
+    }
+}
