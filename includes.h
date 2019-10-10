@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <openssl/ssl.h>
 #include <sstream>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -23,8 +24,12 @@ int connectToPort(int port);
 vector<string> splitStringOnSpace(string);
 vector<string> splitStringOnHash(string);
 string makemsg(vector<string>);
-void trackerProcessReq(string);
-void peerProcessRequest(string);
-
-void *serverthread(void *sock);
+void trackerProcessRequest(string,int);
+void processPeerRequest(string,int);
+void processTrackerRequest(string,int);
+int sendFile(string filename,int sock);
+void *peerserverthread(void *sock);
+void *trackerConnectionThread(void *sock);
 void *seeder(void *sock);
+
+#define C_SIZE (512*1024)

@@ -1,6 +1,6 @@
 #include "includes.h"
 
-
+ char Buffer [512*1024] ; 
 vector<string> splitStringOnSpace(string input)
 {
     vector<string> res;
@@ -81,4 +81,26 @@ string getHash(string filepath)
 
     totalHash.append(string(shortHash));
     return totalHash;
+}
+
+int sendFile(string filename,int sock)
+{
+    FILE *f=fopen(filename.c_str(),"r");
+    if(!f)
+    return -1;
+
+    fseek(f,0,SEEK_END);
+    int size=ftell(f);
+    rewind(f);
+
+    //send(sock,&size,sizeof(size),0);
+   
+    int n=0;
+	while ( ( n = fread( Buffer , sizeof(char) , 512*1024 , f ) ) > 0  && size > 0 ){
+		send (sock , Buffer, n, 0 );
+   	 	memset ( Buffer , '\0', 512*1024);
+		size = size - n ;
+    }
+    fclose(f);
+    return 0;
 }

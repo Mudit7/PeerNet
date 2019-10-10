@@ -67,7 +67,7 @@ string lookup(string filename)
 
 
 
-void trackerProcessReq(string buffer)
+void trackerProcessReq(string buffer,int sockfd)
 {
     // cases for all kinds of requests
     vector<string> req;
@@ -76,17 +76,25 @@ void trackerProcessReq(string buffer)
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
-        //cout<<filename<<endl;
+        
+        //get list of peer ports containing that file
         string portList=lookup(filename);
-        int newsock;
-        if((newsock=connectToPort(senderPort))<0)
-        {
-            cout<<"connect to port failed..";
-        }
-        string msg="portList";
-        msg+="#";
+        
+        string msg=filename;
+        msg+="#portList#";
         msg+=portList;
-        send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent";
+            perror("send");
+            return;
+        }
+            // string msg="test#test#";
+            // cout<<"sending msg:"<<msg<<endl;
+            // if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0)
+            // {
+            //     cout<<"not sent";
+            //     perror("send");
+            // }
     }
     if(req[1]=="upload")
     {
@@ -94,7 +102,6 @@ void trackerProcessReq(string buffer)
         // string filename=req[1];
         // //cout<<filename<<endl;
         // string portlist=lookup(filename);
-
     }
 }
 
@@ -111,8 +118,10 @@ void *servicethread(void *sockNum)
         while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
           
             cout<<buffer<<endl;
-            trackerProcessReq(string((char*)buffer));
+            trackerProcessReq(string((char*)buffer),sockfd);
            // processReq("download#dsf");
+            
+            
             memset (buffer, '\0', 100);
         }
     }

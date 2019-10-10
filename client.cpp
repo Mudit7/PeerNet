@@ -1,43 +1,67 @@
 #include "includes.h"
 
-
-
 sockin_t serv_addr;
-//./client 3000(own port) 4000(tracker port)
-
-void peerProcessRequest(string input)
+int clientPortNum;
+char buff[C_SIZE];
+void processPeerRequest(string input,int sockfd)
 {
     vector<string> inreq=splitStringOnHash(input);
-    if(inreq[0]=="portList")
+    if(inreq[1]=="share")
     {
-        // int portNum=atoi(inreq[0].c_str());
-        // int newsock;
-        // if((newsock=connectToPort(portNum))<0)
-        // {
-        //     cout<<"connect to port failed..";
-        // }
-        //now form the 'share' request to send to other peers(list recieved from tracker)
-        //send (newsock , (void*)res.c_str(), (size_t)res.size(), 0 );
-        cout<<"\nImma get it from: ";
-        for(int i=1;i<inreq.size();i++)
+        cout<<"share itttt\n";
+       // return;
+        string filename=inreq[2];
+        int recvPort=atoi(inreq[0].c_str());
+        cout<<filename;
+        cout<<"\nPreparing to send this file to peer with port:"<<inreq[0]<<endl;
+       // int newSock=connectToPort(recvPort);
+
+    //     string msg=to_string(clientPortNum);
+    //     msg+="#sendingFile#";
+    //     msg+=filename;
+    //     msg+="#";
+    //    // send the file name and cmd then share file
+    //     cout<<"filename sent";
+    //    send (sockfd ,msg.c_str(), msg.size(), 0 );
+        cout<<"sending file now";
+        if(sendFile(filename,sockfd)<0)
         {
-            cout<<inreq[i]<<" ";
+            cout<<"Failed to Send..";
         }
-        cout<<endl;
+        
+    }
+    if(inreq[1]=="sendingFile")
+    {
+        //FILE *fout=fopen("recvFile","wb");
+            // char buff[C_SIZE];
+        cout<<"recv req to send some file.. oke\n";
+        string fname=inreq[0];
+        int outfilefd=open("recvdFile",O_WRONLY | O_CREAT);
+    }
+    else
+    {
+        cout<<"recieved this: "<<input<<endl;
     }
 }
 
+
+//./client 3000(own port) 4000(tracker port)
 int main(int argc,char *argv[])
 {
     int tracker_sockfd=-1;
-    int clientPortNum;
+    
     int serverPortNum;
     pthread_t thread_id;
 
-    if(argc<3) 
+    if(argc<2) 
     {
         cout<<"Using defaut port numbers...\n";   
         clientPortNum=4001;
+        serverPortNum=4000;
+    }
+    else if(argc==2)
+    {
+        clientPortNum=atoi(argv[1]);
         serverPortNum=4000;
     }
     else
@@ -46,13 +70,22 @@ int main(int argc,char *argv[])
         serverPortNum=atoi(argv[2]);
     }
 
-    // Connect to Tracker
+//**********************
+// Connect to Tracker in a seperate thread
+    
     if((tracker_sockfd=connectToTracker(serverPortNum))<0)
     {
         cout<<"connect failed, exiting..";
         return -1;
     }
+    
+    if (pthread_create(&thread_id, NULL, trackerConnectionThread, (void *)&tracker_sockfd) < 0)
+    {
+        perror("\ncould not create thread in seeder\n");
+    }
+//********************
 
+//**********************
     //Creating peer's own server
     int sock=-1;
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -67,15 +100,16 @@ int main(int argc,char *argv[])
 
     bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));   
     int status=listen(sock,5);
-    //sending server to a thread
-    if (pthread_create(&thread_id, NULL, serverthread, (void *)&sock) < 0)
+    //sending server to a new thread
+    if (pthread_create(&thread_id, NULL, peerserverthread, (void *)&sock) < 0)
     {
         perror("\n Could not create thread\n");
     }
     
+//**********************
 
-    //******************************
-    // process user requests (client side)
+
+// process user requests (client side)
     while(1)
     {
         string input;
@@ -133,7 +167,7 @@ int main(int argc,char *argv[])
            //Hash of file chunks
             string res=makemsg(msg_s);
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
-            cout<<"File Hash sent to tracker\n";
+            cout<<"Download request sent to tracker\n";
         }
     }
 
@@ -141,7 +175,7 @@ int main(int argc,char *argv[])
     return 0;
 }
 
-void *serverthread(void *sock_void)
+void *peerserverthread(void *sock_void)
 {
     //cout<<"Peer Server.. "<<endl;
 
@@ -168,17 +202,91 @@ void *serverthread(void *sock_void)
 
 void *seeder(void *sock_void)
 {
-    int seedersock=*((int*)sock_void);
-    cout<<"new seeder created!\n";
+    int peersock=*((int*)sock_void);
+    cout<<"\nNew seeder created!\n";
     char buffer[100]={0};
     int n=0;
     while(1)
     {
-        while (( n = recv(seedersock , buffer ,100, 0) ) > 0 ){
+        while (( n = recv(peersock , buffer ,100, 0) ) > 0 ){
             cout<<buffer<<endl;
             //process requests from tracker and other peers
-            peerProcessRequest(string((char*)buffer));
+            
+            processPeerRequest(string((char*)buffer),peersock);
+            
+            
+
             memset (buffer, '\0', 100);
         }
+    }
+}
+void *trackerConnectionThread(void *sock_void)
+{
+    cout<<"tracker thread..\n";
+    char buff[1000];
+    int trackersock=*((int*)sock_void);
+        //recv filesize and filename... here, then..
+        int n;
+        while(1){
+            while (( n = recv(trackersock , buff ,100, 0) ) > 0 ){
+            //cout<<buffer<<endl;
+            //put it in a file
+            processTrackerRequest(string((char*)buff),trackersock);
+            //cout<<buff<<endl;
+            }    
+        }
+
+}
+void processTrackerRequest(string input,int sockfd)
+{
+    vector<string> inreq=splitStringOnHash(input);
+    if(inreq[1]=="portList")
+    {
+        // int portNum=atoi(inreq[0].c_str());
+        // int newsock;
+        // if((newsock=connectToPort(portNum))<0)
+        // {
+        //     cout<<"connect to port failed..";
+        // }
+        //now form the 'share' request to send to other peers(list recieved from tracker)
+        //send (newsock , (void*)res.c_str(), (size_t)res.size(), 0 );
+        string filename=inreq[0];
+        cout<<"\nGot some peers from the tracker\n";
+         
+        for(int i=2;i<inreq.size();i++)
+        {
+            int newsock=connectToPort(atoi(inreq[i].c_str()));  //connect to another peer
+            // ask the peer to send this file
+            string msg=to_string(clientPortNum);
+            msg+="#share#";
+            msg+=filename;
+            send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+            // recv file here
+            // int x;
+            // FILE *fout=fopen("recvFile","wb");
+            // char buff[C_SIZE];
+            // //recv filesize and filename... here, then..
+            // while (( x = recv(newsock , buff ,C_SIZE, 0) ) > 0 ){
+            // //cout<<buffer<<endl;
+            // //put it in a file
+            // fwrite (buff , sizeof (char), x, fout);
+            // memset (buff, '\0', C_SIZE);
+            //}
+            
+                // if request was to send some file, send it here with fd of file as return value
+                // recv file here
+            int x;
+            
+            //recv filesize and filename... here, then.. for every chunk
+            FILE *fout=fopen("recvFile","w");
+            while (( x = recv(newsock , buff ,C_SIZE, 0) ) > 0 ){   
+                fwrite (buff , sizeof (char), x, fout);
+                memset (buff, '\0', C_SIZE);
+                cout<<"recieved a chunk of"<<x<<endl;
+            }
+            fclose(fout);
+            
+        }
+        cout<<endl;
     }
 }

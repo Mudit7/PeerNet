@@ -6,14 +6,17 @@ client: client.o
 tracker: tracker.o utils.o
 	g++ tracker.o utils.o ConnectToTracker.o -o tracker -I/usr/local/opt/openssl/include -L/usr/local/opt/openssl/lib -lssl -lcrypto -lpthread
 
-client.o: client.cpp ConnectToTracker.cpp utils.cpp
+client.o: client.cpp ConnectToTracker.o utils.o
 	g++ -c client.cpp
-	g++ -c ConnectToTracker.cpp
-	g++ -c utils.cpp
-tracker.o: tracker.cpp
+	
+tracker.o: tracker.cpp ConnectToTracker.o utils.o
 	g++ -c tracker.cpp
+	
+ConnectToTracker.o: ConnectToTracker.cpp
 	g++ -c ConnectToTracker.cpp
+utils.o:utils.cpp
 	g++ -c utils.cpp
+
 
 clean:
 	rm *.o
