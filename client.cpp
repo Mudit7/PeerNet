@@ -5,7 +5,7 @@ int clientPortNum;
 char buff[C_SIZE];
 
 unordered_map<string,vector<int> > chunkMap;
-chunkRequest req;
+
 
 
 void processPeerRequest(string input,int sockfd)
@@ -31,7 +31,7 @@ void processPeerRequest(string input,int sockfd)
             //send the chunk number
             int chunkNum=chunkNums[i];
             send (sockfd ,&chunkNum,sizeof(chunkNum), 0 );
-            cout<<"sending chunks now\n";
+            // cout<<"sending chunks now\n";
             
             if(sendFileKthChunk(filename,sockfd,chunkNum,filesize,f)<0)
             {
@@ -286,12 +286,12 @@ void processTrackerRequest(string input,int sockfd)
             //spawn a new thread for each port numbers
             pthread_t thread_id;
             int portNum=atoi(inreq[i].c_str());
-            
-            req.filename=filename;
-            req.portNum=portNum;
-            req.filesize=filesize;
-            cout<<"asking port:"<<portNum<<endl;
-            if (pthread_create(&thread_id, NULL, leecher, (void *)&req) < 0)
+            chunkRequest *req=new chunkRequest;
+            req->filename=filename;
+            req->portNum=portNum;
+            req->filesize=filesize;
+            cout<<"Asking port:"<<portNum<<endl;
+            if (pthread_create(&thread_id, NULL, leecher, (void *)req) < 0)
             {
                 perror("\ncould not create thread in seeder\n");
             }        
@@ -328,9 +328,7 @@ void *leecher(void *req_void)
     // recv number of chunks
     int num_of_chunks;
     int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
-    // fseek(fout, num_of_chunks*C_SIZE , SEEK_SET);
-    // fputc('\0', fout);
-    // rewind(fout);
+    
     cout<<"gonna recv "<<num_of_chunks<<" chunk(s)\n";
     //for each chunk, run this
     for(int i=0;i<num_of_chunks;i++)
