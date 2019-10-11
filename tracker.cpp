@@ -1,11 +1,16 @@
 #include "includes.h"
-
+#include <unordered_map>
 using namespace std;
 void *servicethread(void *sock);
+
+//filename,list of ports
+unordered_map<string,vector<string> > fileMap;
+unordered_map<string,int > sizeMap;
 
 // ./tracker 4000(tracker port)
 int main(int argc,char *argv[])
 {
+  
     int serverPortNum;
     if(argc<2) 
     {
@@ -54,17 +59,20 @@ int main(int argc,char *argv[])
     return 0;
 }
 
-string lookup(string filename)
+string lookupPorts(string filename)
 {
     string portlist;
     vector<string> ports;
     //lookup for ports in stored data.. hardcoding here
-    ports.push_back(to_string(7000));
-
+    ports=fileMap[filename];
     portlist=makemsg(ports);
     return portlist;
 }
-
+int lookupFileSize(string filename)
+{
+    int filesize=sizeMap[filename];
+    return filesize;
+}
 
 
 void trackerProcessReq(string buffer,int sockfd)
@@ -78,29 +86,32 @@ void trackerProcessReq(string buffer,int sockfd)
         string filename=req[2];
         
         //get list of peer ports containing that file
-        string portList=lookup(filename);
-        
-        string msg=filename;
-        msg+="#portList#";
-        msg+=portList;
+        string portList=lookupPorts(filename);
+        int filesize=lookupFileSize(filename);
+        vector<string> msg_v;
+        msg_v.push_back(filename);
+        msg_v.push_back(to_string(filesize));
+        msg_v.push_back("portList");
+        msg_v.push_back(portList);
+
+        string msg=makemsg(msg_v);
+        msg=msg.substr(0,msg.length()-2);
+
         if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
             cout<<"Not sent";
             perror("send");
             return;
         }
-            // string msg="test#test#";
-            // cout<<"sending msg:"<<msg<<endl;
-            // if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0)
-            // {
-            //     cout<<"not sent";
-            //     perror("send");
-            // }
     }
-    if(req[1]=="upload")
+    if(req[1]=="upload_file")
     {
         cout<<"upload request recieved\n";
-        // string filename=req[1];
-        // //cout<<filename<<endl;
+        string filename=req[2];
+        string filesize=req[3];
+        string portNum=req[0];
+        cout<<"adding "<<filename<<" to the maps\n"<<endl;
+        fileMap[filename].push_back(portNum);
+        sizeMap[filename]=atoi(filesize.c_str());
         // string portlist=lookup(filename);
     }
 }

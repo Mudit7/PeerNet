@@ -12,6 +12,7 @@
 #include <openssl/ssl.h>
 #include <sstream>
 #include <fcntl.h>
+#include <unordered_map>
 
 using namespace std;
 
@@ -31,5 +32,23 @@ int sendFile(string filename,int sock);
 void *peerserverthread(void *sock);
 void *trackerConnectionThread(void *sock);
 void *seeder(void *sock);
+void *leecher(void *req_void);
+
+const char* getChunkHash(char* data);
+
+int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f);
+int recvFileKthChunk(string filename,int sock,int k, int filesize,FILE *f);
+
+int getFileSize(string filename);
+string lookupPorts(string filename);
+int lookupFileSize(string filename);
+
 
 #define C_SIZE (512*1024)
+#define MAX_RECV (8*1024)
+
+typedef struct chunkRequest{
+    string filename;
+    int portNum;
+    int filesize;
+}chunkRequest;
