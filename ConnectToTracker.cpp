@@ -4,12 +4,12 @@
 using namespace std;
 int connectToTracker(int port)
 {
-    cout<<"\nConnecting to tracker on port "<<port<<endl;
+    cout<<"\rConnecting to tracker on port "<<port<<endl;
     sockin_t server_addr;
     int sock_d;
     if ((sock_d = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("\nSocket creation error in client side\n");
+        printf("\rSocket creation error in client side\n");
         perror("socket");
         return -1;
     }
@@ -22,17 +22,17 @@ int connectToTracker(int port)
         perror("connect");
         return -1;
     }
-    cout<<"connection done!\n";
+    cout<<"\rconnection done!\n";
     return sock_d;
 }
 int connectToPort(int port)
 {
-    cout<<"\nConnecting to peer on port "<<port<<endl;
+    cout<<"\rConnecting to peer on port "<<port<<endl;
     sockin_t server_addr;
     int sock_d;
     if ((sock_d = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("\nSocket creation error in client side\n");
+        printf("\rSocket creation error in client side\n");
         perror("socket");
         return -1;
     }
@@ -45,6 +45,6 @@ int connectToPort(int port)
         perror("connect");
         return -1;
     }
-    cout<<"connection done!\n";
+    cout<<"Connected!\n";
     return sock_d;
 }
