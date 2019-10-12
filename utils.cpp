@@ -1,6 +1,6 @@
 #include "includes.h"
 
- char Buffer [512*1024] ; 
+char Buffer [C_SIZE] ; 
 vector<string> splitStringOnSpace(string input)
 {
     vector<string> res;
@@ -89,6 +89,7 @@ string getHash(string filepath)
 
 int sendFile(string filename,int sock)
 {
+    char *buff=new char[C_SIZE];
     FILE *f=fopen(filename.c_str(),"r");
     if(!f)
     return -1;
@@ -100,18 +101,20 @@ int sendFile(string filename,int sock)
     //send(sock,&size,sizeof(size),0);
    
     int n=0;
-    memset ( Buffer , '\0', C_SIZE);
-	while ( ( n = fread( Buffer , sizeof(char) , 512*1024 , f ) ) > 0  && size > 0 ){
-		send (sock , Buffer, n, 0 );
-   	 	memset ( Buffer , '\0', 512*1024);
+    memset ( buff , '\0', C_SIZE);
+	while ( ( n = fread( buff , sizeof(char) , C_SIZE , f ) ) > 0  && size > 0 ){
+		send (sock , buff, n, 0 );
+   	 	memset ( buff , '\0', C_SIZE);
 		size = size - n ;
     }
     fclose(f);
+    free(buff);
     return 0;
 }
 
 int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
 {
+    char *buff=new char[C_SIZE];
     int x=-1;
     if(!f)
     return -1;
@@ -126,19 +129,20 @@ int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
     else
         data_chunk_size=C_SIZE; 
 
-    memset ( Buffer , '\0', C_SIZE);
+    memset ( buff , '\0', C_SIZE);
     int n=0;
-    cout<<"Sending "<<k<<"th chunk\n";
-	while((n = fread( Buffer , sizeof(char) , MAX_RECV , f ))>0){
+    cout<<"\rSending "<<k<<"th chunk of size "<<data_chunk_size<<endl;
+	while((n = fread( buff , sizeof(char) , MAX_RECV , f ))>0){
     if(n>0)
-    x=send (sock , Buffer, n, 0 );
+    x=send (sock , buff, n, 0 );
     //cout<<"Sent "<<x<<" Bytes\n";
-    memset ( Buffer , '\0', C_SIZE);
+    memset ( buff , '\0', C_SIZE);
     data_chunk_size=data_chunk_size-x;
     if(data_chunk_size<=0)
         break;
     }
     rewind(f);
+    free(buff);
     return 0;
 }
 
@@ -152,7 +156,7 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
     if(k*C_SIZE > filesize) return -1;
     //seet file pointer to correct offset
     fseek(f,k*C_SIZE,SEEK_SET);
-    cout<<"Recieving "<<k<<"th chunk\n";
+    cout<<"\rRecieving "<<k<<"th chunk\n";
     int data_chunk_size;
     if(last_chunk_num==k)   //if last chunked is asked 
         data_chunk_size=filesize%C_SIZE;

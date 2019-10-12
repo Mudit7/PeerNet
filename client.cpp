@@ -2,11 +2,13 @@
 
 sockin_t serv_addr;
 int clientPortNum;
+int tracker_sockfd;
 char buff[C_SIZE];
 
 unordered_map<string,vector<int> > chunkMap;
 
-
+string user_id;
+string passwd;
 
 void processPeerRequest(string input,int sockfd)
 {
@@ -16,23 +18,20 @@ void processPeerRequest(string input,int sockfd)
         string filename=inreq[2];
         FILE *f=fopen(filename.c_str(),"rb");
         int recvPort=atoi(inreq[0].c_str());
-        //cout<<filename;
-
         int filesize=getFileSize(filename);
 
-        cout<<"\nPreparing to send this file to peer with port:"<<inreq[0]<<endl;
+        cout<<"\rPreparing to send this file to port:"<<inreq[0]<<endl;
   
         vector<int> chunkNums=chunkMap[filename];
         int num_of_chunks=chunkNums.size();
         send (sockfd ,&num_of_chunks,sizeof(num_of_chunks), 0 );
         for(int i=0;i<chunkNums.size();i++){
-            //send filesize
-            
-            //send the chunk number
+           
+            //send the chunk number first
             int chunkNum=chunkNums[i];
             send (sockfd ,&chunkNum,sizeof(chunkNum), 0 );
-            // cout<<"sending chunks now\n";
             
+            // cout<<"sending chunks now\n";
             if(sendFileKthChunk(filename,sockfd,chunkNum,filesize,f)<0)
             {
                 cout<<"Failed to Send..\n";
@@ -47,7 +46,7 @@ void processPeerRequest(string input,int sockfd)
 //./client 3000(own port) 4000(tracker port)
 int main(int argc,char *argv[])
 {
-    int tracker_sockfd=-1;
+    tracker_sockfd=-1;
     
     int serverPortNum;
     pthread_t thread_id;
@@ -56,7 +55,7 @@ int main(int argc,char *argv[])
     if(argc<2) 
     {
         cout<<"Using defaut port numbers...\n";   
-        clientPortNum=4001;
+        clientPortNum=5000;
         serverPortNum=4000;
     }
     else if(argc==2)
@@ -70,12 +69,11 @@ int main(int argc,char *argv[])
         serverPortNum=atoi(argv[2]);
     }
 
-//**********************
-// Connect to Tracker in a seperate thread
+    // Connect to Tracker in a seperate thread
     
     if((tracker_sockfd=connectToTracker(serverPortNum))<0)
     {
-        cout<<"connect failed, exiting..";
+        cout<<"\rConnect failed, exiting..\n";
         return -1;
     }
     
@@ -83,9 +81,9 @@ int main(int argc,char *argv[])
     {
         perror("\ncould not create thread in seeder\n");
     }
-//********************
 
-//Creating peer's own server
+
+    //Creating peer's own server
     int sock=-1;
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -105,11 +103,11 @@ int main(int argc,char *argv[])
         perror("\n Could not create thread\n");
     }
     
-// process user requests (client side)
+    // process user requests (client side)
     while(1)
     {
         string input;
-        cout<<"Enter cmd: ";
+        cout<<"\r$$ ";
         getline(cin,input);
         vector<string> input_s = splitStringOnSpace(input);
         if(input_s.size()<1) continue;
@@ -120,7 +118,7 @@ int main(int argc,char *argv[])
         {
             if(input_s.size()!=3)
             {
-                cout<<"Invalid Input.. try again\n";
+                cout<<"\rInvalid Input.. try again...\n";
                 continue;
             } 
             msg_s.push_back(to_string(clientPortNum));   //port of the client
@@ -133,11 +131,11 @@ int main(int argc,char *argv[])
             cout<<"Create user request sent to tracker\n";
         }
 
-        else if(input_s[0]=="upload_file")
+        else if(input_s[0]=="upload")
         {
             if(input_s.size()!=2)
             {
-                cout<<"Invalid Input.. try again\n";
+                cout<<"\rInvalid Input.. try again\n";
                 continue; 
             }
             //format -> port#cmd#filename#hash
@@ -158,14 +156,15 @@ int main(int argc,char *argv[])
             int num_of_chunks=filesize/C_SIZE;
             if(filesize%C_SIZE!=0)
                 num_of_chunks++;
-/*************/ 
+            cout<<"\nTotal chunks to be downloaded="<<num_of_chunks<<endl;
+/******************** ACTUAL CODE ******************************************************/
             // for(int i=0;i<num_of_chunks;i++) 
             // {
             //     chunkMap[filename].push_back(i);
             // }
-/*************/
-//************ change after testing*******
-/********/
+/***************************************************************************************/
+
+/******************** TEST SCENARIO upper half and lower half split **********************/
             if(clientPortNum==8000)
             {
                 for(int i=0;i<num_of_chunks/2;i++) 
@@ -180,26 +179,57 @@ int main(int argc,char *argv[])
                     chunkMap[filename].push_back(i);
                 }
             }
-/********/
+/***************************************************************************************/
         }
         else if(input_s[0]=="download")
         {
             if(input_s.size()!=2)
             {
-                cout<<"Invalid Input.. try again\n";
+                cout<<"\rInvalid Input.. try again\n";
                 continue; 
             }  
             msg_s.push_back(to_string(clientPortNum));   //port of the client
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //filename
-           //Hash of file chunks
-            string res=makemsg(msg_s);
-            //initial download
-            send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
+            //Hash of file chunks
+            string msg=makemsg(msg_s);
+            //initial download sequence
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
             cout<<"Download request sent to tracker\n";
         }
+
+        else if(input_s[0]=="login")
+        {
+            if(input_s.size()!=3)
+            {
+                cout<<"\rInvalid Input.. try again\n";
+                continue; 
+            } 
+            msg_s.push_back(to_string(clientPortNum));
+            string user_id=input_s[1];
+            string passwd =input_s[2];
+            msg_s.push_back(input_s[0]);
+            msg_s.push_back(user_id);
+            msg_s.push_back(passwd);
+            string msg=makemsg(msg_s);
+            //send create user msg
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );   
+        }
+        else if(input_s[0]=="logout")
+        {
+            if(input_s.size()!=1)
+            {
+                cout<<"\rInvalid Input.. try again\n";
+                continue; 
+            }
+            msg_s.push_back(to_string(clientPortNum));
+            msg_s.push_back(input_s[0]);
+            string msg=makemsg(msg_s);
+            //send create user msg
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        }
         else{
-            cout<<"Invalid Command\n"<<input<<endl;
+            cout<<"\rInvalid Command\n"<<input<<endl;
         }
     }
 
@@ -209,16 +239,13 @@ int main(int argc,char *argv[])
 
 void *peerserverthread(void *sock_void)
 {
-    //cout<<"Peer Server.. "<<endl;
-
-    
     int addrlen=sizeof(serv_addr);
     pthread_t thread_id;
     int mainserversock=*((int*)sock_void);
     while(1)
     {
         int newsockfd=accept(mainserversock,(sock_t*)&serv_addr,(socklen_t*)&addrlen);
-            //cout<<"incoming!!\n";
+        //cout<<"incoming!!\n";
         if(newsockfd<0)
         {
             perror("accept");
@@ -235,15 +262,15 @@ void *peerserverthread(void *sock_void)
 void *seeder(void *sock_void)
 {
     int peersock=*((int*)sock_void);
-    cout<<"\nNew seeder created!\n";
+    cout<<"\rNew seeder created!\n";
     char buffer[100]={0};
     int n=0;
     while(1)
     {
         while (( n = recv(peersock , buffer ,100, 0) ) > 0 ){
             cout<<buffer<<endl;
-            //process requests from tracker and other peers
-            
+
+            //process requests from tracker and other peers     
             processPeerRequest(string((char*)buffer),peersock);
         
             memset (buffer, '\0', 100);
@@ -252,17 +279,16 @@ void *seeder(void *sock_void)
 }
 void *trackerConnectionThread(void *sock_void)
 {
-    cout<<"tracker thread..\n";
-    char buff[1000];
+    cout<<"\rtracker connection thread..\n";
+    char buff[100];
     int trackersock=*((int*)sock_void);
         //recv filesize and filename... here, then..
     int n;
     while(1){
         while (( n = recv(trackersock , buff ,100, 0) ) > 0 ){
-        //cout<<buffer<<endl;
         //put it in a file
         processTrackerRequest(string((char*)buff),trackersock);
-        //cout<<buff<<endl;
+        memset ( buff , '\0', 100);
         }    
     }
 
@@ -270,17 +296,34 @@ void *trackerConnectionThread(void *sock_void)
 void processTrackerRequest(string input,int sockfd)
 {
     vector<string> inreq=splitStringOnHash(input);
-    if(inreq[2]=="portList")
+    //format -> filename#filesize#"portlist"#6000#143441...
+    cout<<"\rRecieved this from tracker: ";
+    cout<<input<<endl;
+    if(inreq[0]=="login")
+    {
+        if(inreq[1]=="failed")
+            cout<<"\rInvalid creds,try again...\n";
+        else if(inreq[1]=="success")
+            cout<<"\rLogin success!\n";
+        else if(inreq[1]=="incomplete")
+            cout<<"\rNot logged in to tracker!\n";
+    }
+    if(inreq[0]=="create_user")
+    {
+        if(inreq[1]=="failed")
+            cout<<"\rUser not created,try again...\n";
+        else if(inreq[1]=="success")
+            cout<<"\rNew User Created!\n";
+    }
+    else if((inreq.size()>2)&&(inreq[2]=="portList"))
     {
         //now form the 'share' request to send to other peers(list recieved from tracker)
         //input form -> filename#portlist#port1#port2#...
-        cout<<"input="<<input<<endl;
+        //cout<<"input="<<input<<endl;
         string filename=inreq[0];
-        cout<<"\nGot some peers from the tracker\n";
-         //ask each client
+        cout<<"\rGot some peers from the tracker\n";
+        //ask each client
         int filesize=atoi(inreq[1].c_str());
-        // create a new file here with this size and name
-
         for(int i=3;i<inreq.size();i++)
         {
             //spawn a new thread for each port numbers
@@ -290,10 +333,10 @@ void processTrackerRequest(string input,int sockfd)
             req->filename=filename;
             req->portNum=portNum;
             req->filesize=filesize;
-            cout<<"Asking port:"<<portNum<<endl;
+            cout<<"\rAsking port:"<<portNum<<endl;
             if (pthread_create(&thread_id, NULL, leecher, (void *)req) < 0)
             {
-                perror("\ncould not create thread in seeder\n");
+                perror("\rCould not create thread in seeder\n");
             }        
         }
         cout<<endl;
@@ -302,12 +345,12 @@ void processTrackerRequest(string input,int sockfd)
 
 void *leecher(void *req_void)
 {
-    //for recieveing chunks from another peer
+    //  for recieveing chunks from another peer
     chunkRequest *req=(chunkRequest*)req_void;
     string filename=req->filename;
     int port=req->portNum;
     int filesize=req->filesize;
-    cout<<"\nNew leecher created!\n";
+    cout<<"\rNew leecher created!\n";
     int n=0;
     pthread_t thread_id;
     int newsock=connectToPort(port);  //connect to another peer
@@ -315,11 +358,12 @@ void *leecher(void *req_void)
     {
         perror("leecher,accept");
     }
-    // ask the peer to send this file
-    //#
+
+    // form the share request
     string msg=to_string(clientPortNum);
     msg+="#share#";
     msg+=filename;
+    // send the share request
     send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
     
     // recv file here
@@ -329,21 +373,28 @@ void *leecher(void *req_void)
     int num_of_chunks;
     int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
     
-    cout<<"gonna recv "<<num_of_chunks<<" chunk(s)\n";
+    cout<<"\rGonna recv "<<num_of_chunks<<" chunk(s) from port "<<port<<endl;
+
     //for each chunk, run this
     for(int i=0;i<num_of_chunks;i++)
     {
-    // recv chunk num
         int chunkNum;
-    // recv data
         recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
         if(recvFileKthChunk(filename,newsock,chunkNum,filesize,fout)<0)
         {
             cout<<"Failed to Recv..\n";
             return NULL;
-        }       
+        }
+        chunkMap[filename].push_back(chunkNum);
+        //notify tracker about this chunk being recieved
+        //format -> port#cmd#filename#hash
+        string msg=to_string(clientPortNum);
+        msg+="#upload#";
+        msg+=filename;
+        send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        
     }
-    cout<<"File Downloaded Successfully(probably)!";
+    //cout<<"\n\rFile Downloaded Successfully(probably)!";
     fclose(fout);
     return NULL;
 }

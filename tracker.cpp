@@ -3,9 +3,11 @@
 using namespace std;
 void *servicethread(void *sock);
 
-//filename,list of ports
-unordered_map<string,vector<string> > fileMap;
+//  filename,list of ports
+unordered_map<string,vector<string> > filePortMap;
 unordered_map<string,int > sizeMap;
+unordered_map<string,User> portUserMap;
+
 
 // ./tracker 4000(tracker port)
 int main(int argc,char *argv[])
@@ -14,7 +16,7 @@ int main(int argc,char *argv[])
     int serverPortNum;
     if(argc<2) 
     {
-        cout<<"Using defaut port numbers...\n";   
+        cout<<"Using defaut port number "<<serverPortNum<<endl;   
         serverPortNum=4000;
     }
     else
@@ -39,7 +41,7 @@ int main(int argc,char *argv[])
     int addrlen=sizeof(serv_addr);
 
     bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));  
-    int status=listen(sock,5);
+    int status=listen(sock,50);
     cout<<"tracker initialised\n";
     //one thread per client
     while(1)
@@ -64,7 +66,7 @@ string lookupPorts(string filename)
     string portlist;
     vector<string> ports;
     //lookup for ports in stored data.. hardcoding here
-    ports=fileMap[filename];
+    ports=filePortMap[filename];
     portlist=makemsg(ports);
     return portlist;
 }
@@ -74,13 +76,59 @@ int lookupFileSize(string filename)
     return filesize;
 }
 
-
 void trackerProcessReq(string buffer,int sockfd)
 {
     // cases for all kinds of requests
     vector<string> req;
     req=splitStringOnHash(buffer);
-    if(req[1]=="download")
+    string msg;
+    cout<<"command recieved="<<req[1]<<endl;
+    if(req[1]=="login")
+    {
+        //check userid and passwd
+        if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
+        {
+            portUserMap[req[0]].islogged=true;
+            cout<<req[2]<<" login successful\n";
+            msg="login#success";
+        }
+        else
+        {
+            cout<<"Invalid credentials, Couldn't login\n";
+            msg="login#failed";
+        }
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+
+    }
+    else if(req[1]=="create_user")
+    {
+        User u;
+        u.user_id=req[2];
+        u.passwd=req[3];
+        u.islogged=false;
+        portUserMap[req[0]]=u;
+        cout<<"User added\n";
+        string msg="create_user#success";
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+    }
+    else if(!portUserMap[req[0]].islogged){
+        //cout<<"Login First!\n";
+        string msg="login#incomplete";
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+        }
+        return;
+    } 
+    else if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
@@ -98,21 +146,32 @@ void trackerProcessReq(string buffer,int sockfd)
         msg=msg.substr(0,msg.length()-2);
 
         if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent";
+            cout<<"Not sent\n";
             perror("send");
             return;
         }
     }
-    if(req[1]=="upload_file")
+    else if(req[1]=="upload")
     {
         cout<<"upload request recieved\n";
         string filename=req[2];
         string filesize=req[3];
+        if(req.size()>4)
+        {
+            string SHA=req[4];
+            cout<<"SHA to be uploaded\n";
+        }
         string portNum=req[0];
         cout<<"adding "<<filename<<" to the maps\n"<<endl;
-        fileMap[filename].push_back(portNum);
+        filePortMap[filename].push_back(portNum);
         sizeMap[filename]=atoi(filesize.c_str());
-        // string portlist=lookup(filename);
+    }
+    
+    
+    else if(req[1]=="logout")
+    {
+        portUserMap[req[0]].islogged=false;
+        cout<<"logout successful";
     }
 }
 
@@ -128,11 +187,10 @@ void *servicethread(void *sockNum)
         int n=0;
         while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
           
+            cout<<"Command Recieved:";
             cout<<buffer<<endl;
             trackerProcessReq(string((char*)buffer),sockfd);
-           // processReq("download#dsf");
-            
-            
+           // processReq("download#dsf");        
             memset (buffer, '\0', 100);
         }
     }

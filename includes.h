@@ -52,3 +52,10 @@ typedef struct chunkRequest{
     int portNum;
     int filesize;
 }chunkRequest;
+
+class User{
+    public:
+    string user_id;
+    string passwd;
+    bool islogged;
+};
