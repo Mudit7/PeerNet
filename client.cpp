@@ -3,8 +3,7 @@
 sockin_t serv_addr;
 int clientPortNum;
 int tracker_sockfd;
-char buff[C_SIZE];
-
+pthread_mutex_t mylock;
 unordered_map<string,vector<int> > chunkMap;
 
 string user_id;
@@ -90,7 +89,7 @@ int main(int argc,char *argv[])
         printf("\n Socket creation error in client side\n");
         return -1;
     }
-    memset(&serv_addr, '0', sizeof(serv_addr));
+    memset(&serv_addr, '\0', sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(clientPortNum);
     serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
@@ -103,6 +102,13 @@ int main(int argc,char *argv[])
         perror("\n Could not create thread\n");
     }
     
+
+    if (pthread_mutex_init(&mylock, NULL) != 0) 
+    { 
+        printf("\n mutex init has failed\n"); 
+        return 1; 
+    } 
+
     // process user requests (client side)
     while(1)
     {
@@ -141,12 +147,17 @@ int main(int argc,char *argv[])
             //format -> port#cmd#filename#hash
             string filename=input_s[1];
             int filesize=getFileSize(filename);
+            if(filesize<0)
+            {
+                cout<<"Invalid file\n";
+                continue;
+            }
             msg_s.push_back(to_string(clientPortNum));   //port of the client  
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(filename);      //filename
             msg_s.push_back(to_string(filesize));
-            string fileHash=getHash(input_s[1]);
-            msg_s.push_back(fileHash);        //Hash of file chunks
+            //string fileHash=getHash(input_s[1]);
+            //msg_s.push_back(fileHash);        //Hash of file chunks
             string res=makemsg(msg_s);
 
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
@@ -156,7 +167,7 @@ int main(int argc,char *argv[])
             int num_of_chunks=filesize/C_SIZE;
             if(filesize%C_SIZE!=0)
                 num_of_chunks++;
-            cout<<"\nTotal chunks to be downloaded="<<num_of_chunks<<endl;
+            //cout<<"\nTotal chunks to be downloaded="<<num_of_chunks<<endl;
 /******************** ACTUAL CODE ******************************************************/
             // for(int i=0;i<num_of_chunks;i++) 
             // {
@@ -367,7 +378,11 @@ void *leecher(void *req_void)
     send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
     
     // recv file here
-    FILE *fout=fopen(filename.c_str(),"a+");
+    // create a new file
+    FILE *fout=fopen(filename.c_str(),"w");
+    fclose(fout);
+    //now open in append mode
+    fout=fopen(filename.c_str(),"ab+");
     
     // recv number of chunks
     int num_of_chunks;
@@ -378,23 +393,30 @@ void *leecher(void *req_void)
     //for each chunk, run this
     for(int i=0;i<num_of_chunks;i++)
     {
-        int chunkNum;
+        int chunkNum=-1;
         recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
+        if(chunkNum<0)
+            cout<<"\nWrong chunk num. recieved "<<chunkNum<<endl;
         if(recvFileKthChunk(filename,newsock,chunkNum,filesize,fout)<0)
         {
             cout<<"Failed to Recv..\n";
             return NULL;
         }
+        //lock
+        pthread_mutex_lock(&mylock); 
         chunkMap[filename].push_back(chunkNum);
+        pthread_mutex_unlock(&mylock); 
+        //unlock
+
         //notify tracker about this chunk being recieved
         //format -> port#cmd#filename#hash
         string msg=to_string(clientPortNum);
         msg+="#upload#";
         msg+=filename;
+        
         send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
         
     }
-    //cout<<"\n\rFile Downloaded Successfully(probably)!";
     fclose(fout);
     return NULL;
 }

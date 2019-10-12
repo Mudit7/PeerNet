@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <unordered_map>
 
+
 using namespace std;
 
 typedef struct sockaddr_in sockin_t;
@@ -42,7 +43,7 @@ int recvFileKthChunk(string filename,int sock,int k, int filesize,FILE *f);
 int getFileSize(string filename);
 string lookupPorts(string filename);
 int lookupFileSize(string filename);
-
+bool ispresentvs(vector<string>,string);
 
 #define C_SIZE (512*1024)
 #define MAX_RECV (8*1024)

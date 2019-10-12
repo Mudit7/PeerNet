@@ -58,7 +58,7 @@ string getHash(string filepath)
     //cout<<"sockfd is "<<sock<<endl;
     //send(sock,&size,sizeof(size),0);
     string totalHash;
-    unsigned char chunk[512*1024]={0};
+    unsigned char *chunk=new unsigned char[C_SIZE];
     unsigned char hashout[20];
     int n=0;
     string digest;
@@ -72,7 +72,7 @@ string getHash(string filepath)
         }
         digest+= string((char*)partial);
         
-   	 	memset ( chunk , '\0', sizeof(chunk));
+   	 	memset ( chunk , '\0', C_SIZE);
 		size = size - sizeof(chunk) ;
     }
     // calculate short hash
@@ -84,6 +84,7 @@ string getHash(string filepath)
     }
 
     totalHash.append(string(shortHash));
+    free(chunk);
     return totalHash;
 }
 
@@ -149,6 +150,7 @@ int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
 int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
 {
     //FILE *f=fopen(filename.c_str(),"w+");
+    char *buff=new char[C_SIZE];
     if(!f)
     return -1;
 
@@ -162,21 +164,22 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
         data_chunk_size=filesize%C_SIZE;
     else
         data_chunk_size=C_SIZE;  
-    memset ( Buffer , '\0', C_SIZE);
+    memset ( buff , '\0', C_SIZE);
     int n;
     while(data_chunk_size>0)
     {
         //cout<<"chunksize:"<<data_chunk_size<<endl;
-        n=recv (sock , Buffer, MAX_RECV, 0 );
+        n=recv (sock , buff, MAX_RECV, 0 );
         //cout<<"Recieved "<<n<<" Bytes\n";
         //cout<<"Buffer "<<Buffer<<endl;
-        fwrite( Buffer , sizeof(char) , n , f );
-        memset ( Buffer , '\0', C_SIZE);
+        fwrite( buff , sizeof(char) , n , f );
+        memset ( buff , '\0', C_SIZE);
         data_chunk_size=data_chunk_size-n;
         if(data_chunk_size<=0)
             break;
     }
     rewind(f);
+    free(buff);
     return 0;
 }
 
@@ -222,4 +225,17 @@ int getFileSize(string filename)
     fclose(f);
 
     return filesize;
+}
+bool ispresentvs(vector<string> arr,string str)
+{
+    bool res=false;
+    for(int i=0;i<arr.size();i++)
+    {
+        if(arr[i]==str)
+        {
+            res=true;
+            break;
+        }
+    }
+    return res;
 }

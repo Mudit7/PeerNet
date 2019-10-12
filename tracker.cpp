@@ -7,17 +7,16 @@ void *servicethread(void *sock);
 unordered_map<string,vector<string> > filePortMap;
 unordered_map<string,int > sizeMap;
 unordered_map<string,User> portUserMap;
-
+pthread_mutex_t mylock;
 
 // ./tracker 4000(tracker port)
 int main(int argc,char *argv[])
 {
-  
     int serverPortNum;
     if(argc<2) 
     {
-        cout<<"Using defaut port number "<<serverPortNum<<endl;   
         serverPortNum=4000;
+        cout<<"Using defaut port number "<<serverPortNum<<endl;   
     }
     else
     {
@@ -88,7 +87,11 @@ void trackerProcessReq(string buffer,int sockfd)
         //check userid and passwd
         if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
         {
+            //lock
+            pthread_mutex_lock(&mylock); 
             portUserMap[req[0]].islogged=true;
+            pthread_mutex_unlock(&mylock); 
+            //unlock
             cout<<req[2]<<" login successful\n";
             msg="login#success";
         }
@@ -109,8 +112,15 @@ void trackerProcessReq(string buffer,int sockfd)
         User u;
         u.user_id=req[2];
         u.passwd=req[3];
-        u.islogged=false;
+        /********for testing*******/
+        u.islogged=true;        
+        /**************************/
+        //lock
+        pthread_mutex_lock(&mylock); 
+        if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
         portUserMap[req[0]]=u;
+        pthread_mutex_unlock(&mylock); 
+        //unlock
         cout<<"User added\n";
         string msg="create_user#success";
         if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
@@ -152,32 +162,47 @@ void trackerProcessReq(string buffer,int sockfd)
         }
     }
     else if(req[1]=="upload")
-    {
-        cout<<"upload request recieved\n";
+    {     
         string filename=req[2];
-        string filesize=req[3];
-        if(req.size()>4)
+        string portNum=req[0];
+        if(ispresentvs(filePortMap[filename],portNum))
+            return; // we already have its entry
+        cout<<"upload request recieved\n";
+        if(req.size()>3)        //in case of a new(full) file
+        {
+            string filesize=req[3];
+            sizeMap[filename]=atoi(filesize.c_str());
+        }
+        if(req.size()>4)        //in case of a new(full) file
         {
             string SHA=req[4];
             cout<<"SHA to be uploaded\n";
         }
-        string portNum=req[0];
+        
         cout<<"adding "<<filename<<" to the maps\n"<<endl;
-        filePortMap[filename].push_back(portNum);
-        sizeMap[filename]=atoi(filesize.c_str());
+        //lock
+        pthread_mutex_lock(&mylock); 
+        filePortMap[filename].push_back(portNum);   
+        pthread_mutex_unlock(&mylock); 
+        //unlock
     }
     
     
     else if(req[1]=="logout")
     {
+        //lock
+        pthread_mutex_lock(&mylock); 
         portUserMap[req[0]].islogged=false;
+        pthread_mutex_lock(&mylock); 
+        //unlock
         cout<<"logout successful";
     }
 }
 
+//for every new peer
 void *servicethread(void *sockNum)
 {
-    cout<<"new thread created.. "<<endl;
+    cout<<"\rThread created for new peer.. "<<endl;
     
     int sockfd=*((int*)sockNum);
 
@@ -187,7 +212,7 @@ void *servicethread(void *sockNum)
         int n=0;
         while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
           
-            cout<<"Command Recieved:";
+            cout<<"Data Recieved:";
             cout<<buffer<<endl;
             trackerProcessReq(string((char*)buffer),sockfd);
            // processReq("download#dsf");        
