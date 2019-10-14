@@ -161,7 +161,7 @@ int main(int argc,char *argv[])
             string res=makemsg(msg_s);
 
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
-            cout<<"File Hash sent to tracker\n";
+            cout<<"File Hash sent to tracker: "<<fileHash<<endl;
 
             //update chunk info    
             int num_of_chunks=filesize/C_SIZE;
@@ -301,15 +301,15 @@ void *seeder(void *sock_void)
 void *trackerConnectionThread(void *sock_void)
 {
     cout<<"\rtracker connection thread..\n";
-    char buff[100];
+    char *buff=new char[5000];
     int trackersock=*((int*)sock_void);
         //recv filesize and filename... here, then..
     int n;
     while(1){
-        while (( n = recv(trackersock , buff ,100, 0) ) > 0 ){
+        while (( n = recv(trackersock , buff ,5000, 0) ) > 0 ){
         //put it in a file
         processTrackerRequest(string((char*)buff),trackersock);
-        memset ( buff , '\0', 100);
+        memset ( buff , '\0', 5000);
         }    
     }
 
@@ -318,8 +318,8 @@ void processTrackerRequest(string input,int sockfd)
 {
     vector<string> inreq=splitStringOnHash(input);
     //format -> filename#filesize#"portlist"#6000#143441...
-    cout<<"\rRecieved this from tracker: ";
-    cout<<input<<endl;
+    //cout<<"\rRecieved this from tracker: ";
+    //cout<<input<<endl;
     if(inreq[0]=="login")
     {
         if(inreq[1]=="failed")
@@ -344,7 +344,9 @@ void processTrackerRequest(string input,int sockfd)
         cout<<"\rGot some peers from the tracker\n";
         //ask each client
         int filesize=atoi(inreq[1].c_str());
-        for(int i=3;i<inreq.size();i++)
+        string filehash=inreq[inreq.size()-1];
+        cout<<"\nFILEHASH:"<<filehash<<"\n\n";
+        for(int i=3;i<inreq.size()-1;i++)
         {
             //spawn a new thread for each port numbers
             pthread_t thread_id;
@@ -353,6 +355,7 @@ void processTrackerRequest(string input,int sockfd)
             req->filename=filename;
             req->portNum=portNum;
             req->filesize=filesize;
+            req->filehash=filehash;
             cout<<"\rAsking port:"<<portNum<<endl;
             if (pthread_create(&thread_id, NULL, leecher, (void *)req) < 0)
             {
@@ -370,6 +373,7 @@ void *leecher(void *req_void)
     string filename=req->filename;
     int port=req->portNum;
     int filesize=req->filesize;
+    string filehash=req->filehash;
     cout<<"\rNew leecher created!\n";
     int n=0;
     pthread_t thread_id;
@@ -397,45 +401,48 @@ void *leecher(void *req_void)
     int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
     
     cout<<"\rGonna recv "<<num_of_chunks<<" chunk(s) from port "<<port<<endl;
+    
     FILE *fout;
     //for each chunk, run this
+    
     for(int i=0;i<num_of_chunks;i++)
     {
-        pthread_mutex_lock(&mylock);
         int chunkNum=-1;
+        //cout<<i<<"FILEHASH:"<<filehash<<"\n\n";
         recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
         if(chunkNum<0)
             cout<<"\nWrong chunk num. recieved "<<chunkNum<<endl;
         
-        if(recvFileKthChunk(filename,newsock,chunkNum,filesize,fout)<0)
+        if(recvFileKthChunk(filename,newsock,chunkNum,filesize,filehash)<0)
         {
             cout<<"Failed to Recv..\n";
-            return NULL;
+            //return NULL;
         }
-        pthread_mutex_unlock(&mylock);
-        string hash;
-        int size=C_SIZE;
-        if(i==num_of_chunks-1)
-        {
-            size=filesize%C_SIZE;
-        }
-        if(!verifyChunk(filename,chunkNum,hash,size))
-        {
-            cout<<"File hash didn't match, data corrupted!\n";
-        }
+        // string hash;
+        // int size=C_SIZE;
+        // if(i==num_of_chunks-1)
+        // {
+        //     size=filesize%C_SIZE;
+        // }
+        // if(!verifyChunk(filename,chunkNum,hash,size))
+        // {
+        //     cout<<"File hash didn't match, data corrupted!\n";
+        // }
         //lock
-        pthread_mutex_lock(&mylock); 
-        chunkMap[filename].push_back(chunkNum);
-        pthread_mutex_unlock(&mylock); 
-        //unlock
+        else{
+            pthread_mutex_lock(&mylock); 
+            chunkMap[filename].push_back(chunkNum);
+            pthread_mutex_unlock(&mylock); 
+            //unlock
 
-        //notify tracker about this chunk being recieved
-        //format -> port#cmd#filename#hash
-        string msg=to_string(clientPortNum);
-        msg+="#upload#";
-        msg+=filename;
-        
-        send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+            //notify tracker about this chunk being recieved
+            //format -> port#cmd#filename#hash
+            string msg=to_string(clientPortNum);
+            msg+="#upload#";
+            msg+=filename;
+            
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        }
         
     }
     //fclose(fout);

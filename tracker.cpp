@@ -7,6 +7,7 @@ void *servicethread(void *sock);
 //  filename,list of ports
 unordered_map<string,vector<string> > filePortMap;
 unordered_map<string,int > sizeMap;
+unordered_map<string,string > hashMap;
 unordered_map<string,User> portUserMap;
 pthread_mutex_t mylock;
 
@@ -40,7 +41,10 @@ int main(int argc,char *argv[])
     serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
     int addrlen=sizeof(serv_addr);
 
-    bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));  
+    if(bind(sock,(sock_t*)&serv_addr,sizeof(sock_t)) <0){
+        cout<<"socket creation failed,try again\n";
+        return 0;
+    }  
     int status=listen(sock,50);
     cout<<"tracker initialised\n";
     //one thread per client
@@ -83,63 +87,63 @@ void trackerProcessReq(string buffer,int sockfd)
     req=splitStringOnHash(buffer);
     string msg;
     cout<<"command recieved="<<req[1]<<endl;
-    if(req[1]=="login")
-    {
-        //check userid and passwd
-        if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
-        {
-            //lock
-            pthread_mutex_lock(&mylock); 
-            portUserMap[req[0]].islogged=true;
-            pthread_mutex_unlock(&mylock); 
-            //unlock
-            cout<<req[2]<<" login successful\n";
-            msg="login#success";
-        }
-        else
-        {
-            cout<<"Invalid credentials, Couldn't login\n";
-            msg="login#failed";
-        }
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-            return;
-        }
+    // if(req[1]=="login")
+    // {
+    //     //check userid and passwd
+    //     if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
+    //     {
+    //         //lock
+    //         pthread_mutex_lock(&mylock); 
+    //         portUserMap[req[0]].islogged=true;
+    //         pthread_mutex_unlock(&mylock); 
+    //         //unlock
+    //         cout<<req[2]<<" login successful\n";
+    //         msg="login#success";
+    //     }
+    //     else
+    //     {
+    //         cout<<"Invalid credentials, Couldn't login\n";
+    //         msg="login#failed";
+    //     }
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //         return;
+    //     }
 
-    }
-    else if(req[1]=="create_user")
-    {
-        User u;
-        u.user_id=req[2];
-        u.passwd=req[3];
-        /********for testing*******/
-        u.islogged=true;        
-        /**************************/
-        //lock
-        pthread_mutex_lock(&mylock); 
-        if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
-        portUserMap[req[0]]=u;
-        pthread_mutex_unlock(&mylock); 
-        //unlock
-        cout<<"User added\n";
-        string msg="create_user#success";
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-            return;
-        }
-    }
-    else if(!portUserMap[req[0]].islogged){
-        //cout<<"Login First!\n";
-        string msg="login#incomplete";
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-        }
-        return;
-    } 
-    else if(req[1]=="download")
+    // }
+    // else if(req[1]=="create_user")
+    // {
+    //     User u;
+    //     u.user_id=req[2];
+    //     u.passwd=req[3];
+    //     /********for testing*******/
+    //     u.islogged=true;        
+    //     /**************************/
+    //     //lock
+    //     pthread_mutex_lock(&mylock); 
+    //     if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
+    //     portUserMap[req[0]]=u;
+    //     pthread_mutex_unlock(&mylock); 
+    //     //unlock
+    //     cout<<"User added\n";
+    //     string msg="create_user#success";
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //         return;
+    //     }
+    // }
+    // else if(!portUserMap[req[0]].islogged){
+    //     //cout<<"Login First!\n";
+    //     string msg="login#incomplete";
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //     }
+    //     return;
+    // } 
+    if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
@@ -152,9 +156,9 @@ void trackerProcessReq(string buffer,int sockfd)
         msg_v.push_back(to_string(filesize));
         msg_v.push_back("portList");
         msg_v.push_back(portList);
-
+        msg_v.push_back(hashMap[filename]);
         string msg=makemsg(msg_v);
-        msg=msg.substr(0,msg.length()-2);
+        msg=msg.substr(0,msg.length()-1);
 
         if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
             cout<<"Not sent\n";
@@ -176,8 +180,9 @@ void trackerProcessReq(string buffer,int sockfd)
         }
         if(req.size()>4)        //in case of a new(full) file
         {
-            string SHA=req[4];
-            cout<<"SHA to be uploaded\n";
+            string sha=req[4];
+            hashMap[filename]=sha;
+            cout<<"\nHASH:"<<sha<<endl;
         }
         
         cout<<"adding "<<filename<<" to the maps\n"<<endl;
@@ -209,15 +214,15 @@ void *servicethread(void *sockNum)
 
     while(1)
     {
-        char buffer[100]={0};
+        char *buffer=new char[5000];
         int n=0;
-        while (( n = recv(sockfd , buffer ,100, 0) ) > 0 ){
+        while (( n = recv(sockfd , buffer ,5000, 0) ) > 0 ){
           
-            cout<<"Data Recieved:";
-            cout<<buffer<<endl;
-            trackerProcessReq(string((char*)buffer),sockfd);
+            // cout<<"Data Recieved:";
+            // cout<<buffer<<endl;
+            trackerProcessReq(string(buffer),sockfd);
            // processReq("download#dsf");        
-            memset (buffer, '\0', 100);
+            memset (buffer, '\0', 5000);
         }
     }
     cout<<"Thread Exiting..\n";

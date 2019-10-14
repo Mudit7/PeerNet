@@ -1,5 +1,4 @@
 #include "includes.h"
-pthread_mutex_t mylock1;
 char Buffer [C_SIZE] ; 
 vector<string> splitStringOnSpace(string input)
 {
@@ -70,7 +69,7 @@ int sendFile(string filename,int sock)
 
 int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
 {
-    FILE *f1=fopen(filename.c_str(),"r");
+    FILE *f1=fopen(filename.c_str(),"rb");
     char *buff=new char[C_SIZE];
     int x=-1;
     if(!f1)
@@ -79,7 +78,7 @@ int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
     if(k*C_SIZE > filesize) return -1;
     //seet file pointer to correct offset
     fseek(f1,k*C_SIZE,SEEK_SET);
-    cout<<"ftell before:"<<ftell(f1)<<endl;
+    // cout<<"ftell before:"<<ftell(f1)<<endl;
     int last_chunk_num=filesize/C_SIZE;
     int data_chunk_size;
     if(last_chunk_num==k)   //if last chunked is asked 
@@ -106,7 +105,7 @@ int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
     return 0;
 }
 
-int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
+int recvFileKthChunk(string filename,int sock,int k,int filesize,string filehash)
 {
     
     char *buff=new char[C_SIZE];
@@ -142,16 +141,33 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
             break;
     }
     //cout<<"buff2:"<<buff[2]<<"\nsizee:"<<data_chunk_size;
-    FILE *f1=fopen(filename.c_str(),"a");
+    
+    //check the SHA, if correct then write
+    if(k!=last_chunk_num) {
+        cout<<"k="<<k<<",last:"<<last_chunk_num<<endl;
+        if(filehash.substr(k*40,40)==getChunkHash(buff,tsize))
+        {
+            cout<<"hash is verified\n";
+        }
+        else
+        {
+            cout<<"incorrect hash,not writing\n";
+            cout<<filehash.substr(k*40,40)<<"  AND  "<<getChunkHash(buff,tsize)<<endl;
+            return -1;
+        }
+    }
+
+    FILE *f1=fopen(filename.c_str(),"rb+");
+
     if(!f1)
         return -1;
     
+
     fseek(f1,k*C_SIZE,SEEK_SET);
-    //cout<<" k = "<<k<<", ftell before:"<<ftell(f1)<<endl;
     fwrite( buff , sizeof(char) , tsize , f1 );
-    //cout<<" k = "<<k<<", ftell after:"<<ftell(f1)<<" ,tsize="<<tsize<<endl;
-    //cout<<buff;
+   
     free(buff);
+    rewind(f1);
     fclose(f1);
     return 0;
 }
@@ -160,7 +176,7 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
 int getFileSize(string filename)
 {
     int filesize;
-    FILE *f=fopen(filename.c_str(),"r");
+    FILE *f=fopen(filename.c_str(),"rb");
     if(!f)
         return -1;
 
@@ -227,12 +243,11 @@ string getHash(string filepath)
  
     totalHash.append(string(shortHash));
     free(chunk);
-    return totalHash;
+    return digest;
 }
 
 const char* getChunkHash(char* data,int size)
 {
-    unsigned char chunk[C_SIZE]={0};
     unsigned char hashout[20];
     string digest;
     char partial[40];
@@ -242,9 +257,6 @@ const char* getChunkHash(char* data,int size)
         sprintf(partial+i*2,"%02x", hashout[i]);           
     }
     digest+= string((char*)partial);
-    
-    memset ( chunk , '\0', sizeof(chunk));
-    
     return digest.c_str();
 } 
 bool verifyChunk(string filename,int k,string correct_hash,int size)
