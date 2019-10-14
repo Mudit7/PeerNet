@@ -44,10 +44,15 @@ int getFileSize(string filename);
 string lookupPorts(string filename);
 int lookupFileSize(string filename);
 bool ispresentvs(vector<string>,string);
+bool verifyChunk(string filename,int k,string correct_hash,int size);
 
-#define C_SIZE (512*1024)
-#define MAX_RECV (8*1024)
-
+//#define C_SIZE (512*1024)
+//#define MAX_RECV (8*1024)
+/*************
+ * test
+ *************/
+#define C_SIZE (64)
+#define MAX_RECV (4)
 typedef struct chunkRequest{
     string filename;
     int portNum;

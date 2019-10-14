@@ -2,6 +2,7 @@
 #include <unordered_map>
 using namespace std;
 void *servicethread(void *sock);
+//void *trackerserverthread(void *sock);
 
 //  filename,list of ports
 unordered_map<string,vector<string> > filePortMap;

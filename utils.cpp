@@ -1,5 +1,5 @@
 #include "includes.h"
-
+pthread_mutex_t mylock1;
 char Buffer [C_SIZE] ; 
 vector<string> splitStringOnSpace(string input)
 {
@@ -19,7 +19,7 @@ vector<string> splitStringOnSpace(string input)
 vector<string> splitStringOnHash(string input)
 {
     vector<string> res;
-    if(input.size()>2) 
+    if(input.size()>2)
     {
         stringstream ss(input);
         string token;
@@ -44,49 +44,6 @@ string makemsg(vector<string> input_s)
     return res;
 }
 
-string getHash(string filepath)
-{
-    FILE *f=fopen(filepath.c_str(),"rb");
-    if(f==NULL)
-    {
-        perror("Error, client");
-        return NULL;
-    }
-    fseek(f,0,SEEK_END);
-    int size=ftell(f);
-    rewind(f);
-    //cout<<"sockfd is "<<sock<<endl;
-    //send(sock,&size,sizeof(size),0);
-    string totalHash;
-    unsigned char *chunk=new unsigned char[C_SIZE];
-    unsigned char hashout[20];
-    int n=0;
-    string digest;
-    char partial[40];
-	while ( ( n = fread( chunk , sizeof(char) , sizeof(chunk) , f ) ) > 0  && size > 0 ){
-		//read and send chunk by chunk
-        SHA(chunk,n,hashout);
-        
-        for (int i = 0; i < 20; i++) {
-            sprintf(partial+i*2,"%02x", hashout[i]);           
-        }
-        digest+= string((char*)partial);
-        
-   	 	memset ( chunk , '\0', C_SIZE);
-		size = size - sizeof(chunk) ;
-    }
-    // calculate short hash
-    SHA((unsigned char*)digest.c_str(),digest.size(),hashout);
-    
-    char shortHash[20];
-    for (int i = 0; i < 10; i++) {
-            sprintf(shortHash+i*2,"%02x", hashout[i]);           
-    }
-
-    totalHash.append(string(shortHash));
-    free(chunk);
-    return totalHash;
-}
 
 int sendFile(string filename,int sock)
 {
@@ -98,8 +55,6 @@ int sendFile(string filename,int sock)
     fseek(f,0,SEEK_END);
     int size=ftell(f);
     rewind(f);
-
-    //send(sock,&size,sizeof(size),0);
    
     int n=0;
     memset ( buff , '\0', C_SIZE);
@@ -113,16 +68,18 @@ int sendFile(string filename,int sock)
     return 0;
 }
 
-int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
+int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
 {
+    FILE *f1=fopen(filename.c_str(),"r");
     char *buff=new char[C_SIZE];
     int x=-1;
-    if(!f)
+    if(!f1)
     return -1;
 
     if(k*C_SIZE > filesize) return -1;
     //seet file pointer to correct offset
-    fseek(f,k*C_SIZE,SEEK_SET);
+    fseek(f1,k*C_SIZE,SEEK_SET);
+    cout<<"ftell before:"<<ftell(f1)<<endl;
     int last_chunk_num=filesize/C_SIZE;
     int data_chunk_size;
     if(last_chunk_num==k)   //if last chunked is asked 
@@ -132,8 +89,8 @@ int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
 
     memset ( buff , '\0', C_SIZE);
     int n=0;
-    cout<<"\rSending "<<k<<"th chunk of size "<<data_chunk_size<<endl;
-	while((n = fread( buff , sizeof(char) , MAX_RECV , f ))>0){
+    //cout<<"\rSending "<<k<<"th chunk of size "<<data_chunk_size<<endl;
+	while((n = fread( buff , sizeof(char) , MAX_RECV , f1 ))>0){
     if(n>0)
     x=send (sock , buff, n, 0 );
     //cout<<"Sent "<<x<<" Bytes\n";
@@ -142,76 +99,64 @@ int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
     if(data_chunk_size<=0)
         break;
     }
-    rewind(f);
+    //cout<<"ftell after:"<<ftell(f1)<<"\n\n";
+    rewind(f1);
     free(buff);
+    fclose(f1);
     return 0;
 }
 
-int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f)
+int recvFileKthChunk(string filename,int sock,int k,int filesize,FILE *f2)
 {
-    //FILE *f=fopen(filename.c_str(),"w+");
+    
     char *buff=new char[C_SIZE];
-    if(!f)
-    return -1;
+    
 
     int last_chunk_num=filesize/C_SIZE;
     if(k*C_SIZE > filesize) return -1;
     //seet file pointer to correct offset
-    fseek(f,k*C_SIZE,SEEK_SET);
-    cout<<"\rRecieving "<<k<<"th chunk\n";
+    
+    //cout<<"\rRecieving "<<k<<"th chunk "<<"ftell before:"<<ftell(f1)<<endl;
     int data_chunk_size;
     if(last_chunk_num==k)   //if last chunked is asked 
         data_chunk_size=filesize%C_SIZE;
     else
         data_chunk_size=C_SIZE;  
+    int tsize=data_chunk_size;
     memset ( buff , '\0', C_SIZE);
     int n;
+    int cur=0;
     while(data_chunk_size>0)
     {
         //cout<<"chunksize:"<<data_chunk_size<<endl;
-        n=recv (sock , buff, MAX_RECV, 0 );
-        //cout<<"Recieved "<<n<<" Bytes\n";
-        //cout<<"Buffer "<<Buffer<<endl;
-        fwrite( buff , sizeof(char) , n , f );
-        memset ( buff , '\0', C_SIZE);
+        if(data_chunk_size>MAX_RECV)
+            n=recv (sock , buff+cur, MAX_RECV, 0 );
+        else
+            n=recv (sock , buff+cur, data_chunk_size, 0 );
+        //fwrite( buff , sizeof(char) , n , f1 );
+        //memset ( buff , '\0', C_SIZE);
+        
         data_chunk_size=data_chunk_size-n;
+        cur+=n;
         if(data_chunk_size<=0)
             break;
     }
-    rewind(f);
+    //cout<<"buff2:"<<buff[2]<<"\nsizee:"<<data_chunk_size;
+    FILE *f1=fopen(filename.c_str(),"a");
+    if(!f1)
+        return -1;
+    
+    fseek(f1,k*C_SIZE,SEEK_SET);
+    //cout<<" k = "<<k<<", ftell before:"<<ftell(f1)<<endl;
+    fwrite( buff , sizeof(char) , tsize , f1 );
+    //cout<<" k = "<<k<<", ftell after:"<<ftell(f1)<<" ,tsize="<<tsize<<endl;
+    //cout<<buff;
     free(buff);
+    fclose(f1);
     return 0;
 }
 
-const char* getChunkHash(char* data)
-{
-    
-    string totalHash;
-    unsigned char chunk[512*1024]={0};
-    unsigned char hashout[20];
-    int n=0;
-    string digest;
-    char partial[40];
-    SHA((unsigned char*)data,n,hashout);
-    
-    for (int i = 0; i < 20; i++) {
-        sprintf(partial+i*2,"%02x", hashout[i]);           
-    }
-    digest+= string((char*)partial);
-    
-    memset ( chunk , '\0', sizeof(chunk));
-    
-    // calculate short hash
-    SHA((unsigned char*)digest.c_str(),digest.size(),hashout);
-    
-    char shortHash[20];
-    for (int i = 0; i < 10; i++) {
-        sprintf(shortHash+i*2,"%02x", hashout[i]);           
-    }
 
-    totalHash.append(string(shortHash));
-    return totalHash.c_str();
-}
 int getFileSize(string filename)
 {
     int filesize;
@@ -237,5 +182,74 @@ bool ispresentvs(vector<string> arr,string str)
             break;
         }
     }
+    return res;
+}
+
+string getHash(string filepath)
+{
+    FILE *f=fopen(filepath.c_str(),"rb");
+    if(f==NULL)
+    {
+        perror("Error, client");
+        return NULL;
+    }
+    fseek(f,0,SEEK_END);
+    int size=ftell(f);
+    rewind(f);
+
+    string totalHash;
+    unsigned char *chunk=new unsigned char[C_SIZE];
+
+    unsigned char hashout[20];
+    int n=0;
+    string digest;
+    char partial[40];
+	while ( ( n = fread( chunk , sizeof(char) , C_SIZE , f ) ) > 0  && size > 0 ){
+		//calc sha chunkwise
+        SHA(chunk,n,hashout);
+        
+        for (int i = 0; i < 20; i++) {
+            sprintf(partial+i*2,"%02x", hashout[i]);           
+        }
+        digest+= string((char*)partial);
+        
+   	 	memset ( chunk , '\0', C_SIZE);
+		size = size - n ;
+        cout<<n<<endl;
+    }
+    // calculate short hash
+    SHA((unsigned char*)digest.c_str(),digest.size(),hashout);
+    
+    char shortHash[20];
+    for (int i = 0; i < 10; i++) {
+            sprintf(shortHash+i*2,"%02x", hashout[i]);           
+    }
+ 
+    totalHash.append(string(shortHash));
+    free(chunk);
+    return totalHash;
+}
+
+const char* getChunkHash(char* data,int size)
+{
+    unsigned char chunk[C_SIZE]={0};
+    unsigned char hashout[20];
+    string digest;
+    char partial[40];
+    SHA((unsigned char*)data,size,hashout);
+    
+    for (int i = 0; i < 20; i++) {
+        sprintf(partial+i*2,"%02x", hashout[i]);           
+    }
+    digest+= string((char*)partial);
+    
+    memset ( chunk , '\0', sizeof(chunk));
+    
+    return digest.c_str();
+} 
+bool verifyChunk(string filename,int k,string correct_hash,int size)
+{
+    bool res=true;
+    
     return res;
 }

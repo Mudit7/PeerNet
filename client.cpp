@@ -156,8 +156,8 @@ int main(int argc,char *argv[])
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(filename);      //filename
             msg_s.push_back(to_string(filesize));
-            //string fileHash=getHash(input_s[1]);
-            //msg_s.push_back(fileHash);        //Hash of file chunks
+            string fileHash=getHash(input_s[1]);
+            msg_s.push_back(fileHash);        //Hash of file chunks
             string res=makemsg(msg_s);
 
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
@@ -168,14 +168,9 @@ int main(int argc,char *argv[])
             if(filesize%C_SIZE!=0)
                 num_of_chunks++;
             //cout<<"\nTotal chunks to be downloaded="<<num_of_chunks<<endl;
-/******************** ACTUAL CODE ******************************************************/
-            // for(int i=0;i<num_of_chunks;i++) 
-            // {
-            //     chunkMap[filename].push_back(i);
-            // }
-/***************************************************************************************/
 
-/******************** TEST SCENARIO upper half and lower half split **********************/
+
+/******************** TEST SCENARIO - upper half and lower half split **********************/
             if(clientPortNum==8000)
             {
                 for(int i=0;i<num_of_chunks/2;i++) 
@@ -185,7 +180,19 @@ int main(int argc,char *argv[])
             }
             else if(clientPortNum==7000)
             {
-                for(int i=num_of_chunks/2;i<num_of_chunks;i++) 
+                 
+                
+                //for(int i=num_of_chunks-1;i>=num_of_chunks/2;i--)
+                for(int i=num_of_chunks/2;i<num_of_chunks;i++)
+                {
+                    chunkMap[filename].push_back(i);
+                    //cout<<"num:"<<i<<endl;
+                }
+            }
+            
+/************************* ACTUAL CODE *************************************************/
+            else{
+                for(int i=0;i<num_of_chunks;i++) 
                 {
                     chunkMap[filename].push_back(i);
                 }
@@ -206,6 +213,9 @@ int main(int argc,char *argv[])
             string msg=makemsg(msg_s);
             //initial download sequence
             send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+            // create an empty file
+            FILE *fout=fopen(input_s[1].c_str(),"w");
+            fclose(fout);
             cout<<"Download request sent to tracker\n";
         }
 
@@ -328,7 +338,6 @@ void processTrackerRequest(string input,int sockfd)
     }
     else if((inreq.size()>2)&&(inreq[2]=="portList"))
     {
-        //now form the 'share' request to send to other peers(list recieved from tracker)
         //input form -> filename#portlist#port1#port2#...
         //cout<<"input="<<input<<endl;
         string filename=inreq[0];
@@ -367,7 +376,7 @@ void *leecher(void *req_void)
     int newsock=connectToPort(port);  //connect to another peer
     if(newsock<0)
     {
-        perror("leecher,accept");
+        perror("leecher,accept"); 
     }
 
     // form the share request
@@ -379,28 +388,40 @@ void *leecher(void *req_void)
     
     // recv file here
     // create a new file
-    FILE *fout=fopen(filename.c_str(),"w");
-    fclose(fout);
+    
     //now open in append mode
-    fout=fopen(filename.c_str(),"ab+");
+    //fout=fopen(filename.c_str(),"ab+");
     
     // recv number of chunks
     int num_of_chunks;
     int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
     
     cout<<"\rGonna recv "<<num_of_chunks<<" chunk(s) from port "<<port<<endl;
-
+    FILE *fout;
     //for each chunk, run this
     for(int i=0;i<num_of_chunks;i++)
     {
+        pthread_mutex_lock(&mylock);
         int chunkNum=-1;
         recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
         if(chunkNum<0)
             cout<<"\nWrong chunk num. recieved "<<chunkNum<<endl;
+        
         if(recvFileKthChunk(filename,newsock,chunkNum,filesize,fout)<0)
         {
             cout<<"Failed to Recv..\n";
             return NULL;
+        }
+        pthread_mutex_unlock(&mylock);
+        string hash;
+        int size=C_SIZE;
+        if(i==num_of_chunks-1)
+        {
+            size=filesize%C_SIZE;
+        }
+        if(!verifyChunk(filename,chunkNum,hash,size))
+        {
+            cout<<"File hash didn't match, data corrupted!\n";
         }
         //lock
         pthread_mutex_lock(&mylock); 
@@ -417,6 +438,6 @@ void *leecher(void *req_void)
         send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
         
     }
-    fclose(fout);
+    //fclose(fout);
     return NULL;
 }
