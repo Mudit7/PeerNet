@@ -161,7 +161,7 @@ int main(int argc,char *argv[])
             string res=makemsg(msg_s);
 
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
-            cout<<"File Hash sent to tracker: "<<fileHash<<endl;
+            cout<<"File Hash sent to tracker ";
 
             //update chunk info    
             int num_of_chunks=filesize/C_SIZE;
@@ -182,14 +182,14 @@ int main(int argc,char *argv[])
             {
                  
                 
-                //for(int i=num_of_chunks-1;i>=num_of_chunks/2;i--)
-                for(int i=num_of_chunks/2;i<num_of_chunks;i++)
+                for(int i=num_of_chunks-1;i>=num_of_chunks/2;i--)
+                //for(int i=num_of_chunks/2;i<num_of_chunks;i++)
                 {
                     chunkMap[filename].push_back(i);
                     //cout<<"num:"<<i<<endl;
                 }
             }
-            
+           
 /************************* ACTUAL CODE *************************************************/
             else{
                 for(int i=0;i<num_of_chunks;i++) 
@@ -362,6 +362,8 @@ void processTrackerRequest(string input,int sockfd)
                 perror("\rCould not create thread in seeder\n");
             }        
         }
+        // wait until u get list of all port,chunk pairs with a flag
+        //now use ur algo and create a list of (port,list of chunks) and let the threads use em
         cout<<endl;
     }
 }
@@ -390,11 +392,7 @@ void *leecher(void *req_void)
     // send the share request
     send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
     
-    // recv file here
-    // create a new file
-    
-    //now open in append mode
-    //fout=fopen(filename.c_str(),"ab+");
+    // recv file details here
     
     // recv number of chunks
     int num_of_chunks;
@@ -418,6 +416,7 @@ void *leecher(void *req_void)
             cout<<"Failed to Recv..\n";
             //return NULL;
         }
+      
         //lock
         else{
             pthread_mutex_lock(&mylock); 
@@ -432,7 +431,10 @@ void *leecher(void *req_void)
             msg+=filename;
             
             send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
-        }   
+        }
+        
     }
+    //fclose(fout);
+    cout<<"leecher exiting\n";
     return NULL;
 }

@@ -29,13 +29,8 @@ string makemsg(vector<string>);
 void trackerProcessRequest(string,int);
 void processPeerRequest(string,int);
 void processTrackerRequest(string,int);
+
 int sendFile(string filename,int sock);
-void *peerserverthread(void *sock);
-void *trackerConnectionThread(void *sock);
-void *seeder(void *sock);
-void *leecher(void *req_void);
-
-
 int sendFileKthChunk(string filename,int sock,int k,int filesize,FILE *f);
 int recvFileKthChunk(string filename,int sock,int k, int filesize,string filehash);
 
@@ -44,6 +39,13 @@ string lookupPorts(string filename);
 int lookupFileSize(string filename);
 bool ispresentvs(vector<string>,string);
 const char* getChunkHash(char* data,int size);
+
+//threads
+void *peerserverthread(void *sock);
+void *trackerConnectionThread(void *sock);
+void *seeder(void *sock);
+void *leecher(void *req_void);
+void *inputthread(void *sockNum);
 
 //#define C_SIZE (512*1024)
 //#define MAX_RECV (8*1024)

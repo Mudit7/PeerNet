@@ -126,27 +126,22 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,string filehash
     int cur=0;
     while(data_chunk_size>0)
     {
-        //cout<<"chunksize:"<<data_chunk_size<<endl;
         if(data_chunk_size>MAX_RECV)
             n=recv (sock , buff+cur, MAX_RECV, 0 );
         else
             n=recv (sock , buff+cur, data_chunk_size, 0 );
-        //fwrite( buff , sizeof(char) , n , f1 );
-        //memset ( buff , '\0', C_SIZE);
         
         data_chunk_size=data_chunk_size-n;
         cur+=n;
         if(data_chunk_size<=0)
             break;
     }
-    //cout<<"buff2:"<<buff[2]<<"\nsizee:"<<data_chunk_size;
     
     //check the SHA, if correct then write
     if(k!=last_chunk_num) {
-        cout<<"k="<<k<<",last:"<<last_chunk_num<<endl;
         if(filehash.substr(k*40,40)==getChunkHash(buff,tsize))
         {
-            cout<<"hash is verified\n";
+            cout<<"hash is verified for chunk "<<k<<endl;
         }
         else
         {

@@ -48,6 +48,10 @@ int main(int argc,char *argv[])
     int status=listen(sock,50);
     cout<<"tracker initialised\n";
     //one thread per client
+    if (pthread_create(&thread_id, NULL, inputthread, (void *)&sock) < 0)
+    {
+        perror("\ncould not create thread\n");
+    } 
     while(1)
     {
         int client_sockfd=accept(sock,(sock_t*)&serv_addr,(socklen_t*)&addrlen);
@@ -97,7 +101,7 @@ void trackerProcessReq(string buffer,int sockfd)
             portUserMap[req[0]].islogged=true;
             pthread_mutex_unlock(&mylock); 
             //unlock
-            cout<<req[2]<<" login successful\n";
+            cout<<req[2]<<"login successful\n";
             msg="login#success";
         }
         else
@@ -223,4 +227,19 @@ void *servicethread(void *sockNum)
     }
     cout<<"Thread Exiting..\n";
     return NULL;
+}
+void *inputthread(void *sockNum)
+{
+    while(1){
+    string input;
+    cout<<"\r$$ ";
+    getline(cin,input);
+    if(input=="quit")
+    {
+        //free up resources
+        close(*(int*)sockNum);
+        cout<<"\nQuitting Tracker\n";
+        exit(1);
+    }
+    }
 }
