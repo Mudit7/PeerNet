@@ -418,16 +418,6 @@ void *leecher(void *req_void)
             cout<<"Failed to Recv..\n";
             //return NULL;
         }
-        // string hash;
-        // int size=C_SIZE;
-        // if(i==num_of_chunks-1)
-        // {
-        //     size=filesize%C_SIZE;
-        // }
-        // if(!verifyChunk(filename,chunkNum,hash,size))
-        // {
-        //     cout<<"File hash didn't match, data corrupted!\n";
-        // }
         //lock
         else{
             pthread_mutex_lock(&mylock); 
@@ -442,9 +432,7 @@ void *leecher(void *req_void)
             msg+=filename;
             
             send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
-        }
-        
+        }   
     }
-    //fclose(fout);
     return NULL;
 }

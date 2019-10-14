@@ -43,7 +43,6 @@ int getFileSize(string filename);
 string lookupPorts(string filename);
 int lookupFileSize(string filename);
 bool ispresentvs(vector<string>,string);
-bool verifyChunk(string filename,int k,string correct_hash,int size);
 const char* getChunkHash(char* data,int size);
 
 //#define C_SIZE (512*1024)

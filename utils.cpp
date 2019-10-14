@@ -11,8 +11,7 @@ vector<string> splitStringOnSpace(string input)
         while(getline(ss, token, ' ')) {
             res.push_back(token);
         }  
-    }
-    
+    }    
     return res;
 }
 vector<string> splitStringOnHash(string input)
@@ -259,9 +258,3 @@ const char* getChunkHash(char* data,int size)
     digest+= string((char*)partial);
     return digest.c_str();
 } 
-bool verifyChunk(string filename,int k,string correct_hash,int size)
-{
-    bool res=true;
-    
-    return res;
-}
