@@ -17,7 +17,7 @@ void processPeerRequest(string input,int sockfd)
         string filename=inreq[2];
         FILE *f=fopen(filename.c_str(),"rb");
         int recvPort=atoi(inreq[0].c_str());
-        int filesize=getFileSize(filename);
+        int filesize=atoi(inreq[3].c_str());
 
         cout<<"\rPreparing to send this file to port:"<<inreq[0]<<endl;
   
@@ -161,7 +161,7 @@ int main(int argc,char *argv[])
             string res=makemsg(msg_s);
 
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
-            cout<<"File Hash sent to tracker ";
+            cout<<"\rFile Hash sent to tracker \n";
 
             //update chunk info    
             int num_of_chunks=filesize/C_SIZE;
@@ -389,6 +389,8 @@ void *leecher(void *req_void)
     string msg=to_string(clientPortNum);
     msg+="#share#";
     msg+=filename;
+    msg+="#";
+    msg+=to_string(filesize);
     // send the share request
     send (newsock , (void*)msg.c_str(), (size_t)msg.size(), 0 );
     

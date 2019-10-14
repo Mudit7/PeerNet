@@ -91,32 +91,8 @@ void trackerProcessReq(string buffer,int sockfd)
     req=splitStringOnHash(buffer);
     string msg;
     cout<<"command recieved="<<req[1]<<endl;
-    if(req[1]=="login")
-    {
-        //check userid and passwd
-        if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
-        {
-            //lock
-            pthread_mutex_lock(&mylock); 
-            portUserMap[req[0]].islogged=true;
-            pthread_mutex_unlock(&mylock); 
-            //unlock
-            cout<<req[2]<<"login successful\n";
-            msg="login#success";
-        }
-        else
-        {
-            cout<<"Invalid credentials, Couldn't login\n";
-            msg="login#failed";
-        }
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-            return;
-        }
-
-    }
-    else if(req[1]=="create_user")
+    
+    if(req[1]=="create_user")
     {
         User u;
         u.user_id=req[2];
@@ -138,6 +114,37 @@ void trackerProcessReq(string buffer,int sockfd)
             return;
         }
     }
+    if(portUserMap.find(req[0])==portUserMap.end()) 
+    {
+        cout<<"no such user exists!\n";
+        return;
+    }
+    if(req[1]=="login")
+    {
+        //check userid and passwd
+        if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
+        {
+            //lock
+            pthread_mutex_lock(&mylock); 
+            portUserMap[req[0]].islogged=true;
+            pthread_mutex_unlock(&mylock); 
+            //unlock
+            cout<<req[2]<<"login successful\n";
+            msg="login#success";
+        }
+        else
+        {
+            cout<<"Invalid credentials, Couldn't login\n";
+            cout<<"creds are:"<<portUserMap[req[0]].user_id<<" "<<portUserMap[req[0]].user_id<<endl;
+            msg="login#failed";
+        }
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+
+    }
     else if(!portUserMap[req[0]].islogged){
         //cout<<"Login First!\n";
         string msg="login#incomplete";
@@ -147,7 +154,7 @@ void trackerProcessReq(string buffer,int sockfd)
         }
         return;
     } 
-    if(req[1]=="download")
+    else if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
