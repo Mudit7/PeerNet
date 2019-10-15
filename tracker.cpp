@@ -105,7 +105,7 @@ void trackerProcessReq(string buffer,int sockfd)
         //lock
         pthread_mutex_lock(&mylock); 
         if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
-        portUserMap[req[0]]=u;
+            portUserMap[req[0]]=u;
         pthread_mutex_unlock(&mylock); 
         //unlock
         cout<<"User added\n";
@@ -119,6 +119,12 @@ void trackerProcessReq(string buffer,int sockfd)
     if(portUserMap.find(req[0])==portUserMap.end()) 
     {
         cout<<"no such user exists!\n";
+        string msg="create_user#failed";
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
         return;
     }
     if(req[1]=="login")
@@ -131,7 +137,7 @@ void trackerProcessReq(string buffer,int sockfd)
             portUserMap[req[0]].islogged=true;
             pthread_mutex_unlock(&mylock); 
             //unlock
-            cout<<req[2]<<"login successful\n";
+            cout<<req[2]<<" login successful\n";
             msg="login#success";
         }
         else
@@ -156,7 +162,7 @@ void trackerProcessReq(string buffer,int sockfd)
         }
         return;
     } 
-    if(req[1]=="download")
+    else if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
@@ -210,7 +216,22 @@ void trackerProcessReq(string buffer,int sockfd)
         pthread_mutex_unlock(&mylock); 
         //unlock
     }
-    
+    else if(req[1]=="list_files")
+    {
+        cout<<"File List requested\n";
+        vector<string> filelist;
+        unordered_map<std::string, string>::iterator it;
+        for (it = hashMap.begin(); it != hashMap.end(); it++) 
+        filelist.push_back(it->first);
+
+        string msg=makemsg(filelist);
+        cout<<msg<<endl;
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+    }
     
     else if(req[1]=="logout")
     {

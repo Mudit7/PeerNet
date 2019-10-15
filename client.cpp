@@ -151,7 +151,7 @@ int main(int argc,char *argv[])
             msg_s.push_back(to_string(clientPortNum));   //port of the client
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //user id
-            msg_s.push_back(input_s[2]);       //password
+            msg_s.push_back(input_s[2]);      //password
             
             string res=makemsg(msg_s);
             send (tracker_sockfd , (void*)res.c_str(), (size_t)res.size(), 0 );
@@ -269,6 +269,22 @@ int main(int argc,char *argv[])
             string msg=makemsg(msg_s);
             //send create user msg
             send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        }
+        else if(input_s[0]=="list_files")
+        {
+            msg_s.push_back(to_string(clientPortNum));
+            msg_s.push_back(input_s[0]);
+            string msg=makemsg(msg_s);
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+            char *list=new char[100];
+            recv(tracker_sockfd , list ,50, 0);
+            cout<<list;
+            vector<string> filelist=splitStringOnHash(string((char*)list));
+            cout<<"Files Available:\n";
+            for(int i=0;i<filelist.size();i++)
+            {
+                cout<<filelist[i]<<endl;
+            }
         }
         else{
             cout<<"\rInvalid Command\n"<<input<<endl;
