@@ -73,7 +73,9 @@ string lookupPorts(string filename)
 {
     string portlist;
     vector<string> ports;
-    //lookup for ports in stored data.. hardcoding here
+    if(filePortMap.find(filename)==filePortMap.end()) 
+        return "";
+
     ports=filePortMap[filename];
     portlist=makemsg(ports);
     return portlist;
@@ -90,7 +92,7 @@ void trackerProcessReq(string buffer,int sockfd)
     vector<string> req;
     req=splitStringOnHash(buffer);
     string msg;
-    cout<<"command recieved="<<req[1]<<endl;
+    cout<<"input recieved="<<buffer<<endl;
     
     if(req[1]=="create_user")
     {
@@ -154,23 +156,28 @@ void trackerProcessReq(string buffer,int sockfd)
         }
         return;
     } 
-    else if(req[1]=="download")
+    if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
         
         //get list of peer ports containing that file
         string portList=lookupPorts(filename);
+        if(portList=="")
+        {
+            filename="NOT_AVAILABLE";
+        }
         int filesize=lookupFileSize(filename);
         vector<string> msg_v;
         msg_v.push_back(filename);
         msg_v.push_back(to_string(filesize));
         msg_v.push_back("portList");
         msg_v.push_back(portList);
-        msg_v.push_back(hashMap[filename]);
+        if(filePortMap.find(filename)!=filePortMap.end()) 
+            msg_v.push_back(hashMap[filename]);
         string msg=makemsg(msg_v);
-        msg=msg.substr(0,msg.length()-1);
-
+        //msg=msg.substr(0,msg.length()-1);
+        cout<<"Download response:"<<msg<<endl;
         if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
             cout<<"Not sent\n";
             perror("send");
@@ -189,7 +196,7 @@ void trackerProcessReq(string buffer,int sockfd)
             string filesize=req[3];
             sizeMap[filename]=atoi(filesize.c_str());
         }
-        if(req.size()>4)        //in case of a new(full) file
+        if(req.size()==5)        //in case of a new(full) file
         {
             string sha=req[4];
             hashMap[filename]=sha;

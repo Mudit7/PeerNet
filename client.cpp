@@ -5,7 +5,7 @@ int clientPortNum;
 int tracker_sockfd;
 pthread_mutex_t mylock;
 unordered_map<string,vector<int> > chunkMap;
-
+vector<bool> chunkStatus;
 string user_id;
 string passwd;
 
@@ -14,11 +14,12 @@ void processPeerRequest(string input,int sockfd)
     vector<string> inreq=splitStringOnHash(input);
     if(inreq[1]=="share")
     {
+
         string filename=inreq[2];
         FILE *f=fopen(filename.c_str(),"rb");
         int recvPort=atoi(inreq[0].c_str());
         int filesize=atoi(inreq[3].c_str());
-
+        char ack[4]={0};
         cout<<"\rPreparing to send this file to port:"<<inreq[0]<<endl;
   
         vector<int> chunkNums=chunkMap[filename];
@@ -29,6 +30,26 @@ void processPeerRequest(string input,int sockfd)
             //send the chunk number first
             int chunkNum=chunkNums[i];
             send (sockfd ,&chunkNum,sizeof(chunkNum), 0 );
+            //wait for ack or nack
+            recv(sockfd , &ack ,4, 0);
+            string ACK=string(ack);
+            ACK=ACK.substr(0,4);
+            cout<<"ACK:"<<ACK<<endl;
+            if(ACK=="nack")
+            {
+                continue;
+                //dont send it
+            }
+            else if(ACK=="okay")
+            {
+                //just carry on
+            }
+            else
+            {
+                cout<<"Invalid ack\n";
+                continue;
+            }
+            
             
             // cout<<"sending chunks now\n";
             if(sendFileKthChunk(filename,sockfd,chunkNum,filesize,f)<0)
@@ -95,7 +116,7 @@ int main(int argc,char *argv[])
     serv_addr.sin_addr.s_addr=inet_addr("127.0.0.1");
 
     bind(sock,(sock_t*)&serv_addr,sizeof(sock_t));   
-    int status=listen(sock,5);
+    int status=listen(sock,50);
     //sending server to a new thread
     if (pthread_create(&thread_id, NULL, peerserverthread, (void *)&sock) < 0)
     {
@@ -171,19 +192,19 @@ int main(int argc,char *argv[])
 
 
 /******************** TEST SCENARIO - upper half and lower half split **********************/
-            if(clientPortNum==8000)
+            if(clientPortNum==8500)
             {
                 for(int i=0;i<num_of_chunks/2;i++) 
                 {
                     chunkMap[filename].push_back(i);
                 }
             }
-            else if(clientPortNum==7000)
+            else if(clientPortNum==7500)
             {
                  
                 
-                for(int i=num_of_chunks-1;i>=num_of_chunks/2;i--)
-                //for(int i=num_of_chunks/2;i<num_of_chunks;i++)
+                //for(int i=num_of_chunks-1;i>=num_of_chunks/2;i--)
+                for(int i=num_of_chunks/2;i<num_of_chunks;i++)
                 {
                     chunkMap[filename].push_back(i);
                     //cout<<"num:"<<i<<endl;
@@ -217,7 +238,7 @@ int main(int argc,char *argv[])
             FILE *fout=fopen(input_s[1].c_str(),"w");
             fclose(fout);
             cout<<"Download request sent to tracker\n";
-        }
+        }   
 
         else if(input_s[0]=="login")
         {
@@ -338,14 +359,29 @@ void processTrackerRequest(string input,int sockfd)
     }
     else if((inreq.size()>2)&&(inreq[2]=="portList"))
     {
-        //input form -> filename#portlist#port1#port2#...
+        //input form -> filename#filesize#portlist#port1#port2#...
         //cout<<"input="<<input<<endl;
         string filename=inreq[0];
+        if(filename=="NOT_AVAILABLE")
+        {
+            cout<<"File doesn't exist on server\n";
+            return;
+        }
         cout<<"\rGot some peers from the tracker\n";
         //ask each client
         int filesize=atoi(inreq[1].c_str());
         string filehash=inreq[inreq.size()-1];
         cout<<"\nFILEHASH:"<<filehash<<"\n\n";
+        //calculate num of chunks
+        int num_of_chunks=filesize/C_SIZE + (filesize%C_SIZE!=0);
+        cout<<"Number of chunks="<<num_of_chunks<<endl;
+        
+        chunkStatus.clear();
+        chunkStatus.resize(num_of_chunks,0);
+
+        //chunkStatus
+        /***************Initiate download with all the peers**************/
+
         for(int i=3;i<inreq.size()-1;i++)
         {
             //spawn a new thread for each port numbers
@@ -363,7 +399,7 @@ void processTrackerRequest(string input,int sockfd)
             }        
         }
         // wait until u get list of all port,chunk pairs with a flag
-        //now use ur algo and create a list of (port,list of chunks) and let the threads use em
+        // now use ur algo and create a list of (port,list of chunks) and let the threads use em
         cout<<endl;
     }
 }
@@ -401,38 +437,58 @@ void *leecher(void *req_void)
     int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
     
     cout<<"\rGonna recv "<<num_of_chunks<<" chunk(s) from port "<<port<<endl;
+  
+    //notify tracker about this chunk being recieved
+    //format -> port#cmd#filename#hash
+    msg="";
+    msg=to_string(clientPortNum);
+    msg+="#upload#";
+    msg+=filename;
+    //msg+="#";
     
-    FILE *fout;
+    send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+
     //for each chunk, run this
     
     for(int i=0;i<num_of_chunks;i++)
     {
         int chunkNum=-1;
-        //cout<<i<<"FILEHASH:"<<filehash<<"\n\n";
+        
         recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
         if(chunkNum<0)
             cout<<"\nWrong chunk num. recieved "<<chunkNum<<endl;
         
+        //check if this chunk number is already downloaded
+       // pthread_mutex_lock(&mylock);
+        if(chunkStatus[chunkNum])
+        {
+            //send nack
+            send(newsock,"nack",4,0);
+            // cout<<"Chunk already exists:"<<chunkNum<<endl;
+            continue;
+            //onto next chunk
+        }
+        else
+        {
+            send(newsock,"okay",4,0);
+            chunkStatus[chunkNum]=true; //status downloading
+            // cout<<"\rRequesting chunk number:"<<chunkNum<<endl;
+        }
+       // pthread_mutex_unlock(&mylock);
+        
+        //if yes, send nack, else send ack and download it 
         if(recvFileKthChunk(filename,newsock,chunkNum,filesize,filehash)<0)
         {
             cout<<"Failed to Recv..\n";
             //return NULL;
         }
       
-        //lock
+        //if download was successful, update tracker and ...yourself
         else{
             pthread_mutex_lock(&mylock); 
             chunkMap[filename].push_back(chunkNum);
             pthread_mutex_unlock(&mylock); 
-            //unlock
-
-            //notify tracker about this chunk being recieved
-            //format -> port#cmd#filename#hash
-            string msg=to_string(clientPortNum);
-            msg+="#upload#";
-            msg+=filename;
-            
-            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+            //unlock        
         }
         
     }

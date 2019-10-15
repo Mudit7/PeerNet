@@ -115,6 +115,7 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,string filehash
     //seet file pointer to correct offset
     
     //cout<<"\rRecieving "<<k<<"th chunk "<<"ftell before:"<<ftell(f1)<<endl;
+    cout<<"\rRecieving "<<k<<"th chunk "<<endl;
     int data_chunk_size;
     if(last_chunk_num==k)   //if last chunked is asked 
         data_chunk_size=filesize%C_SIZE;
@@ -138,19 +139,23 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,string filehash
     }
     
     //check the SHA, if correct then write
-    if(k!=last_chunk_num) {
-        if(filehash.substr(k*40,40)==getChunkHash(buff,tsize))
-        {
-            cout<<"hash is verified for chunk "<<k<<endl;
-        }
-        else
-        {
-            cout<<"incorrect hash,not writing\n";
-            cout<<filehash.substr(k*40,40)<<"  AND  "<<getChunkHash(buff,tsize)<<endl;
-            return -1;
+    try{
+        if(k!=last_chunk_num) {
+            if(filehash.substr(k*40,40)==getChunkHash(buff,tsize))
+            {
+                cout<<"hash is verified for chunk "<<k<<endl;
+            }
+            else
+            {
+                cout<<"incorrect hash,not writing\n";
+                cout<<filehash.substr(k*40,40)<<"  AND  "<<getChunkHash(buff,tsize)<<endl;
+                return -1;
+            }
         }
     }
-
+    catch(const char* msg){
+        cout<<"Exception Caught\n";
+    }
     FILE *f1=fopen(filename.c_str(),"rb+");
 
     if(!f1)
@@ -225,7 +230,7 @@ string getHash(string filepath)
         
    	 	memset ( chunk , '\0', C_SIZE);
 		size = size - n ;
-        cout<<n<<endl;
+        //cout<<n<<endl;
     }
     // calculate short hash
     SHA((unsigned char*)digest.c_str(),digest.size(),hashout);
