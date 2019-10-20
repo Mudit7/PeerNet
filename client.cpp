@@ -161,13 +161,14 @@ int main(int argc,char *argv[])
 
         else if(input_s[0]=="upload")
         {
-            if(input_s.size()!=2)
+            if(input_s.size()!=3)
             {
                 cout<<"\rInvalid Input.. try again\n";
                 continue; 
             }
-            //format -> port#cmd#filename#hash
+            
             string filename=input_s[1];
+            string gid=input_s[2];
             int filesize=getFileSize(filename);
             if(filesize<0)
             {
@@ -175,11 +176,15 @@ int main(int argc,char *argv[])
                 continue;
             }
             msg_s.clear();
+            //format -> port#cmd#filename#filesize#groupid#hash
             msg_s.push_back(to_string(clientPortNum));   //port of the client  
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(filename);      //filename
+
             msg_s.push_back(to_string(filesize));
-            string fileHash=getHash(input_s[1]);
+            msg_s.push_back(gid);      //group id
+            string fileHash=getHash(filename);
+            cout<<"FileHash:"<<fileHash<<endl;
             msg_s.push_back(fileHash);        //Hash of file chunks
             string res=makemsg(msg_s);
 
@@ -224,7 +229,7 @@ int main(int argc,char *argv[])
         }
         else if(input_s[0]=="download")
         {
-            if(input_s.size()!=2)
+            if(input_s.size()!=3)
             {
                 cout<<"\rInvalid Input.. try again\n";
                 continue; 
@@ -232,13 +237,14 @@ int main(int argc,char *argv[])
             msg_s.clear();
             msg_s.push_back(to_string(clientPortNum));   //port of the client
             msg_s.push_back(input_s[0]);      //cmd
-            msg_s.push_back(input_s[1]);      //filename
+            msg_s.push_back(input_s[1]);       //group id
+            msg_s.push_back(input_s[2]);      //filename
             //Hash of file chunks
             string msg=makemsg(msg_s);
             //initial download sequence
             send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
             // create an empty file
-            FILE *fout=fopen(input_s[1].c_str(),"w");
+            FILE *fout=fopen(input_s[2].c_str(),"w");
             fclose(fout);
             cout<<"Download request sent to tracker\n";
         }   
@@ -277,17 +283,41 @@ int main(int argc,char *argv[])
         {
             msg_s.push_back(to_string(clientPortNum));
             msg_s.push_back(input_s[0]);
+            msg_s.push_back(input_s[1]);
             string msg=makemsg(msg_s);
             send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
-            char *list=new char[100];
-            recv(tracker_sockfd , list ,50, 0);
-            cout<<list;
-            vector<string> filelist=splitStringOnHash(string((char*)list));
-            cout<<"Files Available:\n";
-            for(int i=0;i<filelist.size();i++)
-            {
-                cout<<filelist[i]<<endl;
-            }
+            
+        }
+        else if(input_s[0]=="create_group")
+        {
+            msg_s.push_back(to_string(clientPortNum));
+            msg_s.push_back(input_s[0]);
+            msg_s.push_back(input_s[1]);    //grp id
+            string msg=makemsg(msg_s);
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        }
+        else if(input_s[0]=="join_group")
+        {
+            msg_s.push_back(to_string(clientPortNum));
+            msg_s.push_back(input_s[0]);
+            msg_s.push_back(input_s[1]);    //grp id
+            string msg=makemsg(msg_s);
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        }
+        else if(input_s[0]=="leave_group")
+        {
+            msg_s.push_back(to_string(clientPortNum));
+            msg_s.push_back(input_s[0]);
+            msg_s.push_back(input_s[1]);    //grp id
+            string msg=makemsg(msg_s);
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
+        }
+        else if(input_s[0]=="list_groups")
+        {
+            msg_s.push_back(to_string(clientPortNum));
+            msg_s.push_back(input_s[0]);
+            string msg=makemsg(msg_s);
+            send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
         }
         else{
             cout<<"\rInvalid Command\n"<<input<<endl;
@@ -420,6 +450,36 @@ void processTrackerRequest(string input,int sockfd)
         // wait until u get list of all port,chunk pairs with a flag
         // now use ur algo and create a list of (port,list of chunks) and let the threads use em
         cout<<endl;
+    }
+    else if(inreq[0]=="list_files")
+    {
+        for(int i=1;i<inreq.size();i++)
+        {
+            cout<<"\r"<<inreq[i]<<endl;
+        }
+    }
+    else if(inreq[0]=="create_group")
+    {
+        cout<<"\r"<<inreq[1]<<endl;
+    }
+    else if(inreq[0]=="join_group")
+    {
+        cout<<"\r"<<inreq[1]<<endl;
+    }
+    else if(inreq[0]=="leave_group")
+    {
+        cout<<"\r"<<inreq[1]<<endl;
+    }
+    else if(inreq[0]=="list_groups")
+    {
+        for(int i=1;i<inreq.size();i++)
+        {
+            cout<<"\r"<<inreq[i]<<endl;
+        }
+    }
+    else if(inreq[0]=="upload")
+    {
+        cout<<"\r"<<inreq[1]<<endl;
     }
 }
 

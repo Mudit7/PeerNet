@@ -47,13 +47,13 @@ void *seeder(void *sock);
 void *leecher(void *req_void);
 void *inputthread(void *sockNum);
 
-//#define C_SIZE (512*1024)
-//#define MAX_RECV (8*1024)
+#define C_SIZE (512*1024)
+#define MAX_RECV (8*1024)
 /*************
  * test
  *************/
-#define C_SIZE (64*512*1024)
-#define MAX_RECV (32*1024)
+// #define C_SIZE (64*512*1024)
+// #define MAX_RECV (32*1024)
 typedef struct chunkRequest{
     string filename;
     int portNum;
@@ -66,4 +66,20 @@ class User{
     string user_id;
     string passwd;
     bool islogged;
+};
+
+class File {
+public:
+
+    string shortHash;
+    string filename;
+    int filesize;
+    vector<User*> peerswithfile;
+};
+
+class Group {
+public:   
+    User* owner;
+    string groupid;
+    vector<File> files;
 };

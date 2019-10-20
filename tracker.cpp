@@ -4,11 +4,18 @@ using namespace std;
 void *servicethread(void *sock);
 //void *trackerserverthread(void *sock);
 
-//  filename,list of ports
+//filename,list of ports
 unordered_map<string,vector<string> > filePortMap;
+//filename,filesize
 unordered_map<string,int > sizeMap;
+//filename,hash
 unordered_map<string,string > hashMap;
+//grpid,obj
+unordered_map<string,Group > grpMap;
+
 unordered_map<string,User> portUserMap;
+
+vector<pair<string,string> > usrGrpIdList;
 pthread_mutex_t mylock;
 
 // ./tracker 4000(tracker port)
@@ -94,78 +101,79 @@ void trackerProcessReq(string buffer,int sockfd)
     string msg;
     cout<<"input recieved="<<buffer<<endl;
     
-    // if(req[1]=="create_user")
-    // {
-    //     User u;
-    //     u.user_id=req[2];
-    //     u.passwd=req[3];
-    //     /********for testing*******/
-    //     u.islogged=false;        
-    //     /**************************/
-    //     //lock
-    //     pthread_mutex_lock(&mylock); 
-    //     if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
-    //         portUserMap[req[0]]=u;
-    //     pthread_mutex_unlock(&mylock); 
-    //     //unlock
-    //     cout<<"User added\n";
-    //     string msg="create_user#success";
-    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-    //         cout<<"Not sent\n";
-    //         perror("send");
-    //         return;
-    //     }
-    // }
-    // if(portUserMap.find(req[0])==portUserMap.end()) 
-    // {
-    //     cout<<"no such user exists!\n";
-    //     string msg="create_user#failed";
-    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-    //         cout<<"Not sent\n";
-    //         perror("send");
-    //         return;
-    //     }
-    //     return;
-    // }
-    // if(req[1]=="login")
-    // {
-    //     //check userid and passwd
-    //     if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
-    //     {
-    //         //lock
-    //         pthread_mutex_lock(&mylock); 
-    //         portUserMap[req[0]].islogged=true;
-    //         pthread_mutex_unlock(&mylock); 
-    //         //unlock
-    //         cout<<req[2]<<" login successful\n";
-    //         msg="login#success";
-    //     }
-    //     else
-    //     {
-    //         cout<<"Invalid credentials, Couldn't login\n";
-    //         cout<<"creds are:"<<portUserMap[req[0]].user_id<<" "<<portUserMap[req[0]].user_id<<endl;
-    //         msg="login#failed";
-    //     }
-    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-    //         cout<<"Not sent\n";
-    //         perror("send");
-    //         return;
-    //     }
+    if(req[1]=="create_user")
+    {
+        User u;
+        u.user_id=req[2];
+        u.passwd=req[3];
+        /********for testing*******/
+        u.islogged=false;        
+        /**************************/
+        //lock
+        pthread_mutex_lock(&mylock); 
+        if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
+            portUserMap[req[0]]=u;
+        pthread_mutex_unlock(&mylock); 
+        //unlock
+        cout<<"User added\n";
+        string msg="create_user#success";
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+    }
+    if(portUserMap.find(req[0])==portUserMap.end()) 
+    {
+        cout<<"no such user exists!\n";
+        string msg="create_user#failed";
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+        return;
+    }
+    if(req[1]=="login")
+    {
+        //check userid and passwd
+        if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
+        {
+            //lock
+            pthread_mutex_lock(&mylock); 
+            portUserMap[req[0]].islogged=true;
+            pthread_mutex_unlock(&mylock); 
+            //unlock
+            cout<<req[2]<<" login successful\n";
+            msg="login#success";
+        }
+        else
+        {
+            cout<<"Invalid credentials, Couldn't login\n";
+            cout<<"creds are:"<<portUserMap[req[0]].user_id<<" "<<portUserMap[req[0]].user_id<<endl;
+            msg="login#failed";
+        }
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
 
-    // }
-    // else if(!portUserMap[req[0]].islogged){
-    //     //cout<<"Login First!\n";
-    //     string msg="login#incomplete";
-    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-    //         cout<<"Not sent\n";
-    //         perror("send");
-    //     }
-    //     return;
-    // } 
+    }
+    else if(!portUserMap[req[0]].islogged){
+        //cout<<"Login First!\n";
+        string msg="login#incomplete";
+        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+            cout<<"Not sent\n";
+            perror("send");
+        }
+        return;
+    } 
     if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
-        string filename=req[2];
+        string filename=req[3];
+        string gid=req[2];
         
         //get list of peer ports containing that file
         string portList=lookupPorts(filename);
@@ -194,18 +202,59 @@ void trackerProcessReq(string buffer,int sockfd)
     {     
         string filename=req[2];
         string portNum=req[0];
+        string gid=req[3];
+
         if(ispresentvs(filePortMap[filename],portNum))
             return; // we already have its entry
         cout<<"upload request recieved\n";
       
-        if(req.size()==5)        //in case of a new(full) file
+        if(req.size()==6)        //in case of a new(full) file
         {
             string filesize=req[3];
-            sizeMap[filename]=atoi(filesize.c_str());
-            string sha=req[4];
+            string gid=req[4];
+            string sha=req[5];
+            if(grpMap.find(gid)==grpMap.end())     //group doesn't exist,then return with faliur
+            {
+                string msg="upload#Group_Doesn't_Exist#";
+                if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+                cout<<"Invalid upload query\n";
+                perror("send");
+                }
+                return; //grp doesn't exist
+            }
+            Group *g=&grpMap[gid];
+            User *u=&portUserMap[req[0]];
+            //check in list of users of this grp, if equal to u.userid then only proceed else return
+            if(find(usrGrpIdList.begin(),usrGrpIdList.end(),make_pair(u->user_id,g->groupid)) == usrGrpIdList.end())
+            {
+                string msg="upload#You_dont_belong_here!#";
+                if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+                cout<<"Invalid upload query\n";
+                perror("send");
+                }
+                return;
+            }
+            File f;
+            f.filename=filename;
+            f.filesize=atoi(filesize.c_str());
+            f.peerswithfile.push_back(u);
+            
+            vector<File>::iterator it;
+            for (it = g->files.begin(); it != g->files.end(); it++) 
+            {
+                if(it->filename==filename)
+                {
+                    return;
+                    //don't add in list
+                }
+            }
+
+            sizeMap[filename]=atoi(filesize.c_str());       
             hashMap[filename]=sha;
             cout<<"\nHASH:"<<sha<<endl;
-            cout<<"adding "<<filename<<" to the maps\n"<<endl;
+            cout<<"adding "<<filename<<"and group "<<gid<<" to the maps\n"<<endl;
+            
+
         }
         
         
@@ -219,12 +268,120 @@ void trackerProcessReq(string buffer,int sockfd)
     {
         cout<<"File List requested\n";
         vector<string> filelist;
-        unordered_map<std::string, string>::iterator it;
-        for (it = hashMap.begin(); it != hashMap.end(); it++) 
-        filelist.push_back(it->first);
-
-        string msg=makemsg(filelist);
+        // for (it = hashMap.begin(); it != hashMap.end(); it++) 
+        // filelist.push_back(it->first);
+        string gid=req[2];
+        Group g=grpMap[gid];
+        vector<File>::iterator it;
+        for(it=g.files.begin();it!=g.files.end();it++)
+        {
+            filelist.push_back(it->filename);
+        }
+        string msg="list_files#";
+        msg+=makemsg(filelist);
         cout<<msg<<endl;
+        int x=-1;
+        if((x=send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 ))<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+        cout<<"Sent bytes:"<<x<<endl;
+    }
+    else if(req[1]=="list_groups")
+    {
+        cout<<"Groups List requested\n";
+        vector<string> grplist;
+        unordered_map<std::string, Group>::iterator it;
+        for (it = grpMap.begin(); it != grpMap.end(); it++) 
+        grplist.push_back(it->first);
+        string msg="list_groups#";
+        msg+=makemsg(grplist);
+        cout<<msg<<endl;
+        int x=-1;
+        if((x=send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 ))<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+        cout<<"Sent bytes:"<<x<<endl;
+    }
+    else if(req[1]=="create_group")
+    {
+        Group g;
+        g.groupid=req[2];
+        User *owner;
+        owner=&portUserMap[req[0]];
+        g.owner=owner;
+        g.files.clear();
+        //lock
+        pthread_mutex_lock(&mylock); 
+        if(grpMap.find(req[2])==grpMap.end())     //group doesn't exist,then add
+        {
+            grpMap[req[2]]=g;
+            usrGrpIdList.push_back(make_pair(owner->user_id,g.groupid));
+        }
+        pthread_mutex_unlock(&mylock); 
+        //unlock
+        cout<<"Group added\n";
+        string msg="create_group#success";
+        int x=-1;
+        if((x=send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 ))<0){
+            cout<<"Not sent\n";
+            perror("send");
+            return;
+        }
+        cout<<"Sent bytes:"<<x<<endl;
+    }
+    else if(req[1]=="join_group")
+    {
+        
+        if(grpMap.find(req[2])==grpMap.end())     //group doesn't exist,then return
+        {
+            cout<<"Requested group doesn't exist\n";
+            string msg="join_group#Requested_group_doesn't_exist";
+            if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+                cout<<"Not sent\n";
+                perror("send");
+                return;
+            }
+            return;
+        }
+        else
+        {
+            //lock
+            pthread_mutex_lock(&mylock); 
+            string uid=portUserMap[req[0]].user_id;
+            if(find(usrGrpIdList.begin(),usrGrpIdList.end(),make_pair(req[0],req[2])) == usrGrpIdList.end())
+            {
+                usrGrpIdList.push_back(make_pair(uid,req[2]));
+            }
+            pthread_mutex_unlock(&mylock); 
+            //unlock
+            cout<<"Group added\n";
+            string msg="join_group#success";
+            if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+                cout<<"Not sent\n";
+                perror("send");
+                return;
+            }
+        }
+    }
+    else if(req[1]=="leave_group")
+    {
+        //lock
+        pthread_mutex_lock(&mylock);
+        vector<pair<string, string> >::iterator it;
+        if((it=find(usrGrpIdList.begin(),usrGrpIdList.end(),make_pair(req[0],req[2]))) != usrGrpIdList.end())
+        {
+            usrGrpIdList.erase(it);
+        }
+        //also remove the corresponding files
+        /**********/
+        pthread_mutex_unlock(&mylock); 
+        //unlock
+        cout<<"Group removed\n";
+        string msg="leave_group#success";
         if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
             cout<<"Not sent\n";
             perror("send");
