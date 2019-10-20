@@ -115,7 +115,7 @@ int recvFileKthChunk(string filename,int sock,int k,int filesize,string filehash
     //seet file pointer to correct offset
     
     //cout<<"\rRecieving "<<k<<"th chunk "<<"ftell before:"<<ftell(f1)<<endl;
-    cout<<"\rRecieving "<<k<<"th chunk "<<endl;
+    cout<<"\rRecieving "<<k<<"th chunk from sock"<<sock<<endl;
     int data_chunk_size;
     if(last_chunk_num==k)   //if last chunked is asked 
         data_chunk_size=filesize%C_SIZE;

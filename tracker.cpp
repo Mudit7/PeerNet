@@ -94,75 +94,75 @@ void trackerProcessReq(string buffer,int sockfd)
     string msg;
     cout<<"input recieved="<<buffer<<endl;
     
-    if(req[1]=="create_user")
-    {
-        User u;
-        u.user_id=req[2];
-        u.passwd=req[3];
-        /********for testing*******/
-        u.islogged=false;        
-        /**************************/
-        //lock
-        pthread_mutex_lock(&mylock); 
-        if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
-            portUserMap[req[0]]=u;
-        pthread_mutex_unlock(&mylock); 
-        //unlock
-        cout<<"User added\n";
-        string msg="create_user#success";
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-            return;
-        }
-    }
-    if(portUserMap.find(req[0])==portUserMap.end()) 
-    {
-        cout<<"no such user exists!\n";
-        string msg="create_user#failed";
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-            return;
-        }
-        return;
-    }
-    if(req[1]=="login")
-    {
-        //check userid and passwd
-        if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
-        {
-            //lock
-            pthread_mutex_lock(&mylock); 
-            portUserMap[req[0]].islogged=true;
-            pthread_mutex_unlock(&mylock); 
-            //unlock
-            cout<<req[2]<<" login successful\n";
-            msg="login#success";
-        }
-        else
-        {
-            cout<<"Invalid credentials, Couldn't login\n";
-            cout<<"creds are:"<<portUserMap[req[0]].user_id<<" "<<portUserMap[req[0]].user_id<<endl;
-            msg="login#failed";
-        }
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-            return;
-        }
+    // if(req[1]=="create_user")
+    // {
+    //     User u;
+    //     u.user_id=req[2];
+    //     u.passwd=req[3];
+    //     /********for testing*******/
+    //     u.islogged=false;        
+    //     /**************************/
+    //     //lock
+    //     pthread_mutex_lock(&mylock); 
+    //     if(portUserMap.find(req[0])==portUserMap.end())     //user doesn't exist,then add
+    //         portUserMap[req[0]]=u;
+    //     pthread_mutex_unlock(&mylock); 
+    //     //unlock
+    //     cout<<"User added\n";
+    //     string msg="create_user#success";
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //         return;
+    //     }
+    // }
+    // if(portUserMap.find(req[0])==portUserMap.end()) 
+    // {
+    //     cout<<"no such user exists!\n";
+    //     string msg="create_user#failed";
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //         return;
+    //     }
+    //     return;
+    // }
+    // if(req[1]=="login")
+    // {
+    //     //check userid and passwd
+    //     if((portUserMap[req[0]].user_id==req[2])&&((portUserMap[req[0]].passwd==req[3])))
+    //     {
+    //         //lock
+    //         pthread_mutex_lock(&mylock); 
+    //         portUserMap[req[0]].islogged=true;
+    //         pthread_mutex_unlock(&mylock); 
+    //         //unlock
+    //         cout<<req[2]<<" login successful\n";
+    //         msg="login#success";
+    //     }
+    //     else
+    //     {
+    //         cout<<"Invalid credentials, Couldn't login\n";
+    //         cout<<"creds are:"<<portUserMap[req[0]].user_id<<" "<<portUserMap[req[0]].user_id<<endl;
+    //         msg="login#failed";
+    //     }
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //         return;
+    //     }
 
-    }
-    else if(!portUserMap[req[0]].islogged){
-        //cout<<"Login First!\n";
-        string msg="login#incomplete";
-        if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
-            cout<<"Not sent\n";
-            perror("send");
-        }
-        return;
-    } 
-    else if(req[1]=="download")
+    // }
+    // else if(!portUserMap[req[0]].islogged){
+    //     //cout<<"Login First!\n";
+    //     string msg="login#incomplete";
+    //     if(send (sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 )<0){
+    //         cout<<"Not sent\n";
+    //         perror("send");
+    //     }
+    //     return;
+    // } 
+    if(req[1]=="download")
     {
         int senderPort=atoi(req[0].c_str());
         string filename=req[2];
@@ -197,19 +197,18 @@ void trackerProcessReq(string buffer,int sockfd)
         if(ispresentvs(filePortMap[filename],portNum))
             return; // we already have its entry
         cout<<"upload request recieved\n";
-        if(req.size()>3)        //in case of a new(full) file
+      
+        if(req.size()==5)        //in case of a new(full) file
         {
             string filesize=req[3];
             sizeMap[filename]=atoi(filesize.c_str());
-        }
-        if(req.size()==5)        //in case of a new(full) file
-        {
             string sha=req[4];
             hashMap[filename]=sha;
             cout<<"\nHASH:"<<sha<<endl;
+            cout<<"adding "<<filename<<" to the maps\n"<<endl;
         }
         
-        cout<<"adding "<<filename<<" to the maps\n"<<endl;
+        
         //lock
         pthread_mutex_lock(&mylock); 
         filePortMap[filename].push_back(portNum);   

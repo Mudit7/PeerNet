@@ -52,8 +52,8 @@ void *inputthread(void *sockNum);
 /*************
  * test
  *************/
-#define C_SIZE (512*1024)
-#define MAX_RECV (8*1024)
+#define C_SIZE (64*512*1024)
+#define MAX_RECV (32*1024)
 typedef struct chunkRequest{
     string filename;
     int portNum;

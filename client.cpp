@@ -24,11 +24,12 @@ void processPeerRequest(string input,int sockfd)
   
         vector<int> chunkNums=chunkMap[filename];
         int num_of_chunks=chunkNums.size();
-        send (sockfd ,&num_of_chunks,sizeof(num_of_chunks), 0 );
-        for(int i=0;i<chunkNums.size();i++){
+       // send (sockfd ,&num_of_chunks,sizeof(num_of_chunks), 0 );
+        vector<int>::iterator ptr; 
+        for(ptr=chunkNums.begin();ptr!=chunkNums.end();ptr++){
            
             //send the chunk number first
-            int chunkNum=chunkNums[i];
+            int chunkNum=*ptr;
             send (sockfd ,&chunkNum,sizeof(chunkNum), 0 );
             //wait for ack or nack
             recv(sockfd , &ack ,4, 0);
@@ -173,6 +174,7 @@ int main(int argc,char *argv[])
                 cout<<"Invalid file\n";
                 continue;
             }
+            msg_s.clear();
             msg_s.push_back(to_string(clientPortNum));   //port of the client  
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(filename);      //filename
@@ -227,6 +229,7 @@ int main(int argc,char *argv[])
                 cout<<"\rInvalid Input.. try again\n";
                 continue; 
             }  
+            msg_s.clear();
             msg_s.push_back(to_string(clientPortNum));   //port of the client
             msg_s.push_back(input_s[0]);      //cmd
             msg_s.push_back(input_s[1]);      //filename
@@ -428,6 +431,7 @@ void *leecher(void *req_void)
     int port=req->portNum;
     int filesize=req->filesize;
     string filehash=req->filehash;
+    int num_of_chunks=filesize/C_SIZE + (filesize%C_SIZE!=0);
     cout<<"\rNew leecher created!\n";
     int n=0;
     pthread_t thread_id;
@@ -449,15 +453,15 @@ void *leecher(void *req_void)
     // recv file details here
     
     // recv number of chunks
-    int num_of_chunks;
-    int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
+    //int num_of_chunks=0;
+  //  int x=recv(newsock , &num_of_chunks ,sizeof(num_of_chunks), 0);
     
-    cout<<"\rGonna recv "<<num_of_chunks<<" chunk(s) from port "<<port<<endl;
+    //cout<<"\rGonna recv "<<num_of_chunks<<" chunk(s) from port "<<port<<endl;
   
     //notify tracker about this chunk being recieved
     //format -> port#cmd#filename#hash
-    msg="";
-    msg=to_string(clientPortNum);
+    msg="#";
+    msg+=to_string(clientPortNum);
     msg+="#upload#";
     msg+=filename;
     //msg+="#";
@@ -465,15 +469,15 @@ void *leecher(void *req_void)
     send (tracker_sockfd , (void*)msg.c_str(), (size_t)msg.size(), 0 );
 
     //for each chunk, run this
-    
-    for(int i=0;i<num_of_chunks;i++)
-    {
-        int chunkNum=-1;
-        
-        recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
+    int chunkNum=-1;
+    while(recv(newsock , &chunkNum ,sizeof(chunkNum), 0)>0)
+    {     
+       // recv(newsock , &chunkNum ,sizeof(chunkNum), 0);
         if(chunkNum<0)
-            cout<<"\nWrong chunk num. recieved "<<chunkNum<<endl;
-        
+            {
+                cout<<"\nWrong chunk num. recieved "<<chunkNum<<endl;
+                return 0;
+            }
         //check if this chunk number is already downloaded
        // pthread_mutex_lock(&mylock);
         if(chunkStatus[chunkNum])
@@ -503,6 +507,7 @@ void *leecher(void *req_void)
         else{
             pthread_mutex_lock(&mylock); 
             chunkMap[filename].push_back(chunkNum);
+            if(chunkMap[filename].size()==num_of_chunks) break;
             pthread_mutex_unlock(&mylock); 
             //unlock        
         }
