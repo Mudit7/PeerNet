@@ -23,7 +23,7 @@ vector<string> splitStringOnHash(string input)
         string token;
 
         while(getline(ss, token, '#')) {
-            if(token.length()>0)
+            if(token.length()>1)
             res.push_back(token);
         }  
     }
@@ -35,9 +35,8 @@ string makemsg(vector<string> input_s)
     string res;
     for(int i=0;i<input_s.size();i++)
         {
-            if(input_s[i].length()>0)
-            res=res+input_s[i]+'#';
-        
+            if(input_s[i].length()>1)
+            res=res+input_s[i]+'#';        
         }
     return res;
 }

@@ -202,7 +202,6 @@ void trackerProcessReq(string buffer,int sockfd)
     {     
         string filename=req[2];
         string portNum=req[0];
-        string gid=req[3];
 
         if(ispresentvs(filePortMap[filename],portNum))
             return; // we already have its entry
@@ -252,12 +251,17 @@ void trackerProcessReq(string buffer,int sockfd)
             sizeMap[filename]=atoi(filesize.c_str());       
             hashMap[filename]=sha;
             cout<<"\nHASH:"<<sha<<endl;
-            cout<<"adding "<<filename<<"and group "<<gid<<" to the maps\n"<<endl;
-            
-
+            cout<<"adding "<<filename<<" and group "<<gid<<" and user "<<u->user_id<<" to the maps\n"<<endl;
         }
         
-        
+        vector<string>::iterator it1;
+        for(it1=filePortMap[filename].begin();it1!=filePortMap[filename].end();it1++)
+        {
+            if(*it1==portNum)
+            {
+                return;
+            }
+        }
         //lock
         pthread_mutex_lock(&mylock); 
         filePortMap[filename].push_back(portNum);   
